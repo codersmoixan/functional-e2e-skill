@@ -70,6 +70,16 @@ A compact login smoke matrix is:
 
 Do not send several invented accounts merely to repeat the same server-side rejection branch. If the target starts suppressing feedback, returning throttling responses, or slowing repeated requests, stop equivalent repetitions and record the behavior. Add a cooldown only when the cooldown itself is part of the requirement or the target documents it as necessary; do not turn a discovered delay into a universal fixed wait.
 
+## Saved login
+
+Log in once for an account, then reuse that session for later authenticated features. A second feature, such as editing a profile after an earlier feature already signed in, opens its page with the saved session and does not repeat the login form.
+
+- After the first successful login, save Playwright storage state to `.auth/<role>.json`. That file holds the cookies and local storage, including the session token. Use one file per account role. With playwright-cli, save and load it through `state-save` and `state-load`, as described in [playwright-cli/storage-state.md](playwright-cli/storage-state.md).
+- If the application keeps the token only in the login response, store that token in the same ignored `.auth/` file and apply it the way the application reads it before opening the next page.
+- Before an authenticated feature, load the saved session. When the feature's page opens as an authenticated page, continue. When the saved file is missing, or the application returns to the login page or rejects the token, sign in once, replace the saved file, and continue.
+- A test whose subject is login still performs the login steps. When its valid-login case succeeds, refresh the saved file from that session.
+- Keep `.auth/` out of version control, Allure attachments, screenshots, and failure output. Business records created by one feature stay out of the next feature's preconditions.
+
 ## Recommended new-suite shape
 
 Use repository conventions when present. Otherwise prefer:
@@ -78,13 +88,17 @@ Use repository conventions when present. Otherwise prefer:
 playwright.config.ts
 tests/
   e2e/
-    <feature>.spec.ts
+    <function>/
+      checklist.json
+      <function>.spec.ts
   pages/
     <page-name>.page.ts   # one page object per page a spec opens
   fixtures/               # only when a fixture is used by a test
 playwright-report/        # generated, ignored
 test-results/             # generated, ignored
 ```
+
+`<function>` is the feature being tested, with spaces and path separators removed, such as `新增地址`. Each feature gets its own folder. The checklist and the spec for that feature stay in that folder. A pytest project stores `test_<function>.py` there instead of `<function>.spec.ts`. Page objects stay shared under `tests/pages/` because more than one feature can open the same page. From `tests/e2e/<function>/`, import a page object with `../../pages/<page-name>.page`.
 
 Create `pages/` together with the first page object. Do not add an empty `pages/` or `fixtures/` directory during initialization.
 
@@ -113,7 +127,7 @@ Set configuration from observed project facts:
 - `retries`: normally zero locally and a small number in CI. Retries must not conceal a known deterministic failure.
 - `workers`: respect the application's test-data isolation. Reduce parallelism when tests share unsafe state.
 - `outputDir`: keep screenshots, videos, and traces in a generated artifact directory.
-- `reporter`: concise terminal output plus Allure results in `reports/allure-results`. For Playwright Test, use `allure-playwright`. For pytest, pass `--alluredir=reports/allure-results`. Add JUnit for CI integration or when explicitly requested.
+- `reporter`: concise terminal output plus Allure results in this run's `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. For Playwright Test, point `allure-playwright` `resultsDir` at that directory. For pytest, pass `--alluredir=reports/allure-results/<function>-<YYYYMMDD-HHMMSS>` and do not pass `--clean-alluredir`. Add JUnit for CI integration or when explicitly requested.
 - `use.trace`: prefer `on-first-retry` when CI retries are enabled or `retain-on-failure` when they are not.
 - `use.screenshot`: prefer `only-on-failure`.
 - `use.video`: prefer `retain-on-failure` when video materially helps and runtime cost is acceptable.
@@ -129,7 +143,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: [
     ['list'],
-    ['allure-playwright', { resultsDir: 'reports/allure-results' }],
+    ['allure-playwright', { resultsDir: process.env.ALLURE_RESULTS_DIR ?? 'reports/allure-results' }],
   ],
   outputDir: 'test-results/artifacts',
   use: {
@@ -153,7 +167,7 @@ Change the URL, command, package manager, projects, and artifact choices to matc
 
 ## Functional checklist
 
-Create this checklist the first time a page or function is tested, before its page object and specs. On a later run, reuse the existing checklist and specs. Append controls that a new snapshot shows and the checklist does not already contain. Regenerate the whole checklist only when the user explicitly asks. When the user supplies specs, run those specs and do not create a checklist for that run.
+Create this checklist the first time a page or function is tested, before its page object and specs. On a later run, when the checklist, spec, and page object already exist, run those specs immediately. Do not open the reference guides or the page, and do not read the checklist, until that attempt fails. After one failure, an application defect stops at the evidence. A stale locator or a missing control opens one diagnosis pass for the failing control, then reruns only the affected spec. Recompare the checklist before a run only when the user explicitly asks to recheck it, or explicitly says controls were added, removed, or changed. Then append controls that a new snapshot shows and the checklist does not already contain, and note removals the user described. Regenerate the whole checklist only when the user explicitly asks. When the user supplies specs, run those specs and do not create a checklist for that run.
 
 Run `scripts/checklist_from_snapshot.py` only for a new checklist or for controls being appended. Open menus, dialogs, and post-submit states that belong to the named function and include the new controls in the same JSON. Use source only to confirm a control or route already tied to that function. Draft a missing page object with `scripts/page_object_from_checklist.py` after marking the in-suite items. Extend an existing page object for appended controls or a stale locator. Summarize the Playwright JSON report with `scripts/summarize_playwright_report.py`.
 
@@ -167,9 +181,14 @@ Preconditions: <state required before the action>
 Action: <what the user does>
 Expected result: <what becomes visible>
 Evidence: <snapshot ref, label, or source location>
+Accessible name: <quoted snapshot name>
+Visible text: <text after the colon, when present>
+Scope: <heading or region role and its unique name>
 Path: success | validation | failure
 Coverage: in suite | not yet covered
 ```
+
+The JSON for each item also stores `accessibleName`, `visibleText`, `page`, `scope`, and `scopeRole`. `name` is the visible text when that text differs from the accessible name; otherwise it is whichever of the two is present. `scope` is the nearest preceding unique heading or region at the same indent or higher. Controls from another URL keep that URL in `page` and are generated into that page's class.
 
 - Scope the list to the named function. Include a visible control when the function uses it.
 - A success path is required for each action. A validation or failure path is required when the page shows that outcome or the user stated it.
@@ -185,6 +204,9 @@ When the first specs for a page are written, create that page's page object in t
 - If a page object for that page already exists, extend it with the locators and actions this test needs. Do not create a second class for the same page.
 - The page object owns `goto`, locators, and user actions such as filling a form or submitting. The spec owns test data and assertions.
 - Locators must come from the live page, via playwright-cli, or from the page's source. Do not add controls that were not observed.
+- When the accessible name and the visible text are the same, use `getByRole(role, { name })`. When they differ, use `getByRole(role).filter({ hasText: visibleText })`. When `scope` is set, start from that heading or region and search inside its parent. Run `scripts/page_object_from_checklist.py` once per page. It skips in-suite items whose `page` is a different URL, and it exits without writing a file when two in-suite items still share the same role, visible text, and scope.
+- Before the first suite run, resolve every in-suite locator and require `count()` to be 1. A heading that is only present in the accessibility tree does not prove the overlay is open; the control the next action uses must be inside the viewport.
+- The viewport is 1920×1080 unless this invocation states another resolution. Set that size in `test.use({ viewport })` and keep `deviceScaleFactor` at 1. While a `dialog`, `alertdialog`, `menu`, or `listbox` is open, compare each action control's bottom with `window.innerHeight`. If the control sits below the viewport, scroll the overlay element that contains the control. Do not scroll the document behind the overlay, do not call `scrollIntoViewIfNeeded()` on a control inside a fixed overlay, and do not change the chosen resolution to make the control fit.
 - Initialization alone does not create page objects.
 
 ```ts
@@ -216,7 +238,7 @@ Each test should make its intent and oracle obvious, and should call the page ob
 
 ```ts
 import { test, expect } from '@playwright/test';
-import { ProfilePage } from '../pages/profile.page';
+import { ProfilePage } from '../../pages/profile.page';
 
 test('user can submit a valid profile', async ({ page }) => {
   const profile = new ProfilePage(page);
@@ -234,11 +256,11 @@ Generated tests must include assertions for the intended business result. Review
 
 Use commands matching the project's package manager. A useful sequence is:
 
-1. When this page has no specs yet, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`. When specs already exist, run them and reuse the checklist and page object.
-2. List or compile-discover tests.
+1. When this page has no specs yet, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`. Open each overlay the function uses, measure its action controls against the viewport, and confirm a viewport screenshot leaves the overlay open. When the checklist, spec, and page object already exist, run those specs immediately and skip guide reading, checklist comparison, and playwright-cli. Open that diagnosis flow only after the first attempt fails, and only for a failure that is not an application defect.
+2. List or compile-discover tests only when authoring new specs or diagnosing a compile or configuration failure. An existing-spec rerun goes straight to the suite.
 3. Run the new or changed spec on Chromium.
 4. Classify failures before rerunning. Repair test-code or harness defects and rerun only the affected test or spec.
-5. On live or shared targets, allow one diagnostic rerun for a materially similar failure; use up to three only for a disposable local target.
+5. On live or shared targets, allow one diagnostic rerun for a materially similar failure; use up to three only for a disposable local target. A timeout waiting for a control inside an overlay, a strict-mode match on a repeated visible label, and an overlay that closes after a screenshot or scroll are the same overlay failure. Keep the chosen screenshot size, scroll the overlay container once, then rerun.
 6. Run the final relevant regression group or configured suite once.
 7. Preserve the final HTML and machine-readable reports plus useful failure artifacts.
 
@@ -261,23 +283,29 @@ Separate these categories:
 - Infrastructure failure: the server, browser, dependency, network, or environment could not support execution.
 - Flaky result: repeated executions under the same known conditions disagree.
 
-The Allure report served by `allure open reports/allure-report` is the primary human artifact. Read counts from `reports/allure-report/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status.
+The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status.
 
 ## Allure report contract
 
-Produce this layout after every executed run. Reuse an existing Allure setup when the repository already has one.
+Produce this layout after every executed run. Choose one `<function>-<YYYYMMDD-HHMMSS>` name and use it for both directories. Earlier runs stay in their own directories.
 
 ```text
 reports/
   allure-results/
-    environment.properties
-    *-result.json
+    <function>-<YYYYMMDD-HHMMSS>/
+      environment.properties
+      *-result.json
+      *-attachment.png
+      *-attachment.txt
   allure-report/
-    index.html
-    widgets/summary.json
+    <function>-<YYYYMMDD-HHMMSS>/
+      index.html
+      widgets/summary.json
 ```
 
-Generate it with `allure generate reports/allure-results -o reports/allure-report --clean`. Then start `allure open reports/allure-report` in the background so the report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. Write `environment.properties` first, using the real run values:
+`<function>` is the feature just tested, such as `登录`. Remove spaces and path separators. When this run covers more than one feature, join those names with `-`. The directory name contains that feature text and is not only digits. An example pair is `reports/allure-results/登录-20261014-175800/` and `reports/allure-report/登录-20261014-175800/`.
+
+Write `environment.properties` into the results directory before generation. Generate with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `reports/allure-results/` or `reports/allure-report/` themselves. Then start `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
 
 ```text
 Environment=<env>
@@ -291,8 +319,17 @@ Each case in the report needs:
 
 - a title that states the visible outcome;
 - labels for epic, feature, story, and severity, plus a smoke tag when the case is part of the smoke set;
-- steps for opening the page, performing the action, and checking the result, each with its own status;
-- a named full-page screenshot attached on the assertion step;
+- one step per user-visible operation, including opening the page, each click, fill, or selection, and the assertion, each with its own status;
+- screenshots using the default below, unless the user chose one screenshot per completed flow for this run;
 - a text attachment for an API body or resulting URL when the case observed one, with passwords and tokens redacted.
+
+Screenshot size is 1920×1080 unless this invocation states another resolution, such as `1440×900`. The same width and height apply to the spec viewport, playwright-cli `resize`, and every image attached to the report. Keep `deviceScaleFactor` at 1. Every attached image is a viewport screenshot, `page.screenshot({ fullPage: false })`, so the PNG matches that size. Do not use a full-page screenshot.
+
+Screenshot timing has two modes. Use the default unless this invocation says otherwise.
+
+- **Each operation (default).** After every user-visible operation completes, attach one viewport screenshot to that step. Name the image with the step name.
+- **Each completed flow.** Attach one viewport screenshot only after the flow's final assertion. Name the image with the flow title. Earlier steps in that flow stay in the report without their own screenshots. Use this mode when the user says to capture once after each flow finishes, for example “每个流程完成后再截一张”.
+
+Put a per-operation screenshot in the page-object method only for the default mode. For the flow mode, attach the one screenshot from the spec after the final assertion. Adding or omitting these screenshots does not change the scenario or the assertion. The runner's failure-only screenshot setting does not replace them. Keep passwords and tokens out of screenshot file names.
 
 Playwright Test records these through `allure-playwright`. pytest records them through `allure-pytest` steps, titles, and attachments. Do not invent a second report format when this layout already exists.

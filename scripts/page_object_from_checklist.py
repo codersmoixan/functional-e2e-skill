@@ -51,9 +51,58 @@ def method_name(prefix: str, prop: str) -> str:
     return prefix + prop[:1].upper() + prop[1:]
 
 
-def locator_expression(item: dict) -> str:
+def locator_key(item: dict) -> tuple[str, str, str, str, str]:
+    visible = item.get("visibleText") or item.get("name") or ""
+    return (
+        item.get("role") or "",
+        item.get("accessibleName") or "",
+        visible,
+        item.get("scope") or "",
+        item.get("scopeRole") or "",
+    )
+
+
+def page_matches(page: str, route: str) -> bool:
+    if not route or not page:
+        return True
+    page_path = page.split("?", 1)[0].rstrip("/")
+    route_path = route.split("?", 1)[0].rstrip("/")
+    return page_path == route_path or page_path.endswith(route_path)
+
+
+def item_page(item: dict, document: dict) -> str:
+    return item.get("page") or document.get("page") or ""
+
+
+def select_items(document: dict, route: str) -> list[dict]:
+    selected = [item for item in document.get("items", []) if item.get("coverage") == "in suite"]
+    if not selected:
+        raise ValueError("no checklist items are marked in suite")
+    matched = [item for item in selected if page_matches(item_page(item, document), route)]
+    if not matched:
+        raise ValueError("no in-suite items match this page; run the script once per page")
+    pages = sorted({item_page(item, document) for item in matched if item_page(item, document)})
+    if len(pages) > 1:
+        joined = ", ".join(pages)
+        raise ValueError(f"in-suite items span multiple pages: {joined}. Run the script once per page.")
+    counts: dict[tuple[str, str, str, str, str], int] = {}
+    for item in matched:
+        key = locator_key(item)
+        counts[key] = counts.get(key, 0) + 1
+    ambiguous = [key for key, count in counts.items() if count > 1]
+    if ambiguous:
+        rendered = ", ".join(f"{role or 'control'} {visible or accessible or '(unnamed)'}" for role, accessible, visible, _scope, _scope_role in ambiguous)
+        raise ValueError(f"ambiguous in-suite controls need a unique scope before generating locators: {rendered}")
+    return matched
+
+
+def inner_locator(item: dict) -> str:
     role = item.get("role") or ""
-    name = item.get("name") or ""
+    accessible = item.get("accessibleName") or ""
+    visible = item.get("visibleText") or ""
+    name = item.get("name") or visible or accessible
+    if role and accessible and visible and accessible != visible:
+        return f"page.getByRole({ts_string(role)}).filter({{ hasText: {ts_string(visible)} }})"
     if role and name:
         return f"page.getByRole({ts_string(role)}, {{ name: {ts_string(name)} }})"
     if role:
@@ -61,8 +110,21 @@ def locator_expression(item: dict) -> str:
     return "page.locator('body')"
 
 
+def locator_expression(item: dict) -> str:
+    inner = inner_locator(item)
+    scope = item.get("scope") or ""
+    if not scope:
+        return inner
+    scope_role = item.get("scopeRole") or "heading"
+    relative = inner[5:] if inner.startswith("page.") else inner
+    return (
+        f"page.getByRole({ts_string(scope_role)}, {{ name: {ts_string(scope)} }})"
+        f".locator('..').{relative}"
+    )
+
+
 def render_class(document: dict, class_name: str, route: str) -> str:
-    selected = [item for item in document.get("items", []) if item.get("coverage") == "in suite"]
+    selected = select_items(document, route)
     used: set[str] = set()
     fields: list[tuple[str, dict]] = []
     for item in selected:
@@ -146,6 +208,48 @@ def self_test() -> None:
     assert "async clickSignInButton()" in source
     assert "async fillEmailTextbox(value: string)" in source
     assert "goto('/login')" in source
+    mismatched = render_class(
+        {
+            "page": "https://example.com/form",
+            "items": [
+                {
+                    "role": "button",
+                    "name": "Save",
+                    "accessibleName": "widget-button",
+                    "visibleText": "Save",
+                    "scope": "Details",
+                    "scopeRole": "heading",
+                    "page": "https://example.com/form",
+                    "coverage": "in suite",
+                },
+                {
+                    "role": "button",
+                    "name": "Login",
+                    "page": "https://example.com/login",
+                    "coverage": "in suite",
+                },
+            ],
+        },
+        "FormPage",
+        "/form",
+    )
+    assert "getByRole('heading', { name: 'Details' }).locator('..').getByRole('button').filter({ hasText: 'Save' })" in mismatched
+    assert "Login" not in mismatched
+    try:
+        render_class(
+            {
+                "items": [
+                    {"role": "button", "name": "Add", "visibleText": "Add", "coverage": "in suite"},
+                    {"role": "button", "name": "Add", "visibleText": "Add", "coverage": "in suite"},
+                ]
+            },
+            "FormPage",
+            "/form",
+        )
+    except ValueError as error:
+        assert "ambiguous in-suite controls" in str(error)
+    else:
+        raise AssertionError("duplicate controls should be rejected")
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,11 +275,11 @@ def main() -> int:
         print(f"checklist JSON not found: {args.json_in}", file=sys.stderr)
         return 1
     document = json.loads(args.json_in.read_text(encoding="utf-8"))
-    selected = [item for item in document.get("items", []) if item.get("coverage") == "in suite"]
-    if not selected:
-        print("no checklist items are marked in suite", file=sys.stderr)
+    try:
+        source = render_class(document, args.class_name, args.route)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
         return 2
-    source = render_class(document, args.class_name, args.route)
     sys.stdout.write(source)
     if args.out:
         if args.out.exists():

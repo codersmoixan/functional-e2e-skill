@@ -30,6 +30,7 @@ INTERACTIVE_ROLES = {
     "tab",
     "textbox",
 }
+SCOPE_ROLES = {"heading", "region"}
 
 LINE_RE = re.compile(
     r"^(?P<indent>\s*)-\s+(?P<role>[A-Za-z][A-Za-z0-9]*)"
@@ -37,6 +38,8 @@ LINE_RE = re.compile(
 )
 REF_RE = re.compile(r"\[ref=(?P<ref>[A-Za-z0-9_-]+)\]")
 FLAG_RE = re.compile(r"\[(?P<flag>disabled|checked|pressed|expanded|selected)(?:[= ][^\]]*)?\]")
+BRACKET_RE = re.compile(r"\[[^\]]*\]")
+VISIBLE_RE = re.compile(r":\s*(?P<text>.+?)\s*$")
 SNAPSHOT_LINK_RE = re.compile(r"\[Snapshot\]\((?P<path>[^)]+)\)")
 URL_LINE_RE = re.compile(r"^\s*-\s+/url:\s*(?P<url>\S+)\s*$")
 
@@ -59,8 +62,22 @@ def load_snapshot_text(path: Path) -> str:
     return text
 
 
-def parse_controls(snapshot_text: str) -> list[dict]:
-    controls: list[dict] = []
+def visible_label(rest: str) -> str:
+    cleaned = BRACKET_RE.sub("", rest).strip()
+    match = VISIBLE_RE.match(cleaned)
+    if not match:
+        return ""
+    return unescape_name(match.group("text")).strip()
+
+
+def display_name(accessible_name: str, visible_text: str) -> str:
+    if accessible_name and visible_text and accessible_name != visible_text:
+        return visible_text
+    return visible_text or accessible_name
+
+
+def parse_nodes(snapshot_text: str) -> list[dict]:
+    nodes: list[dict] = []
     pending_link: dict | None = None
     for raw_line in snapshot_text.splitlines():
         url_match = URL_LINE_RE.match(raw_line)
@@ -72,26 +89,53 @@ def parse_controls(snapshot_text: str) -> list[dict]:
         if not match:
             continue
         role = match.group("role")
-        if role not in INTERACTIVE_ROLES:
+        if role not in INTERACTIVE_ROLES and role not in SCOPE_ROLES:
             pending_link = None
             continue
-        name = unescape_name(match.group("name") or "")
         rest = match.group("rest") or ""
+        accessible_name = unescape_name(match.group("name") or "")
+        visible_text = visible_label(rest)
         ref_match = REF_RE.search(rest)
-        flags = FLAG_RE.findall(rest)
-        control = {
+        node = {
+            "indent": len(match.group("indent").replace("\t", "  ")),
             "role": role,
-            "name": name,
+            "accessibleName": accessible_name,
+            "visibleText": visible_text,
+            "name": display_name(accessible_name, visible_text),
             "ref": ref_match.group("ref") if ref_match else "",
-            "flags": flags,
+            "flags": FLAG_RE.findall(rest),
             "url": "",
         }
-        controls.append(control)
-        pending_link = control if role == "link" else None
-    return controls
+        nodes.append(node)
+        pending_link = node if role == "link" else None
+    return nodes
 
 
-def checklist_item(control: dict) -> dict:
+def assign_scope(nodes: list[dict]) -> None:
+    scope_counts: dict[tuple[str, str], int] = {}
+    for node in nodes:
+        if node["role"] in SCOPE_ROLES and node["name"]:
+            key = (node["role"], node["name"])
+            scope_counts[key] = scope_counts.get(key, 0) + 1
+    for index, node in enumerate(nodes):
+        node["scope"] = ""
+        node["scopeRole"] = ""
+        if node["role"] not in INTERACTIVE_ROLES:
+            continue
+        for earlier in range(index - 1, -1, -1):
+            candidate = nodes[earlier]
+            if candidate["role"] not in SCOPE_ROLES or not candidate["name"]:
+                continue
+            if candidate["indent"] > node["indent"]:
+                continue
+            if scope_counts.get((candidate["role"], candidate["name"]), 0) != 1:
+                continue
+            node["scope"] = candidate["name"]
+            node["scopeRole"] = candidate["role"]
+            break
+
+
+def checklist_item(control: dict, page: str) -> dict:
     name = control["name"]
     role = control["role"]
     label = f'{role} "{name}"' if name else role
@@ -99,23 +143,32 @@ def checklist_item(control: dict) -> dict:
     evidence_parts = []
     if ref:
         evidence_parts.append(f"ref={ref}")
-    if name:
-        evidence_parts.append(f"name={name}")
+    if control["accessibleName"]:
+        evidence_parts.append(f"accessibleName={control['accessibleName']}")
+    if control["visibleText"]:
+        evidence_parts.append(f"visibleText={control['visibleText']}")
+    if control["scope"]:
+        evidence_parts.append(f"scope={control['scopeRole']}:{control['scope']}")
     if control["flags"]:
         evidence_parts.append("flags=" + ",".join(control["flags"]))
     if control["url"]:
         evidence_parts.append(f"url={control['url']}")
-    action = f'use {label}'
+    action = f"use {label}"
     if role in {"button", "link", "tab", "menuitem", "menuitemcheckbox", "menuitemradio"}:
-        action = f'click {label}'
+        action = f"click {label}"
     elif role in {"textbox", "searchbox", "spinbutton"}:
-        action = f'fill {label}'
+        action = f"fill {label}"
     elif role in {"checkbox", "radio", "switch"}:
-        action = f'set {label}'
+        action = f"set {label}"
     return {
         "item": label,
         "role": role,
         "name": name,
+        "accessibleName": control["accessibleName"],
+        "visibleText": control["visibleText"],
+        "scope": control["scope"],
+        "scopeRole": control["scopeRole"],
+        "page": page,
         "ref": ref,
         "preconditions": "the named function's page state is visible",
         "action": action,
@@ -141,6 +194,9 @@ def render_text(document: dict) -> str:
                     f"Action: {item['action']}",
                     f"Expected result: {item['expectedResult'] or '<observed or stated outcome>'}",
                     f"Evidence: {item['evidence']}",
+                    f"Accessible name: {item.get('accessibleName') or ''}",
+                    f"Visible text: {item.get('visibleText') or ''}",
+                    f"Scope: {item.get('scopeRole') or ''} {item.get('scope') or ''}".rstrip(),
                     f"Path: {item['path']}",
                     f"Coverage: {item['coverage']}",
                 ]
@@ -152,10 +208,13 @@ def render_text(document: dict) -> str:
 
 
 def build_document(snapshot_text: str, function: str, page: str) -> dict:
+    nodes = parse_nodes(snapshot_text)
+    assign_scope(nodes)
+    items = [checklist_item(node, page) for node in nodes if node["role"] in INTERACTIVE_ROLES]
     return {
         "function": function,
         "page": page,
-        "items": [checklist_item(control) for control in parse_controls(snapshot_text)],
+        "items": items,
     }
 
 
@@ -181,10 +240,35 @@ def self_test() -> None:
     assert document["items"][1]["flags"] == ["disabled"]
     assert document["items"][2]["url"] == "/forgot"
     assert document["items"][0]["expectedResult"] == ""
+    assert document["items"][0]["name"] == "Email"
+    assert document["items"][0]["accessibleName"] == "Email"
+    assert document["items"][0]["visibleText"] == ""
+    assert document["items"][0]["scope"] == "Sign in"
+    assert document["items"][0]["scopeRole"] == "heading"
+    assert document["items"][0]["page"] == "https://example.com/login"
     assert "option" not in roles
     text = render_text(document)
     assert "Function: 登录" in text
     assert "Coverage: not yet covered" in text
+    overlay = """
+- heading "Billing" [level=6] [ref=e1]
+- button "widget-button" [ref=e2]: Add
+- heading "Shipping" [level=6] [ref=e3]
+- button "widget-button" [ref=e4]: Add
+- button "Save order" [ref=e5]
+""".strip(
+        "\n"
+    )
+    overlay_items = build_document(overlay, "地址", "https://example.com/account")["items"]
+    assert [(item["name"], item["scope"]) for item in overlay_items] == [
+        ("Add", "Billing"),
+        ("Add", "Shipping"),
+        ("Save order", "Shipping"),
+    ]
+    assert overlay_items[0]["accessibleName"] == "widget-button"
+    assert overlay_items[0]["visibleText"] == "Add"
+    assert overlay_items[2]["accessibleName"] == "Save order"
+    assert overlay_items[2]["visibleText"] == ""
 
 
 def parse_args() -> argparse.Namespace:
