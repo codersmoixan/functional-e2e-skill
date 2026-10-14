@@ -154,7 +154,7 @@ Change the URL, command, package manager, projects, and artifact choices to matc
 
 ## Functional checklist
 
-When the user asks to test a page or a function on a page, write this checklist before any page object or spec. Derive it from a playwright-cli snapshot of that page, then from menus, dialogs, and post-submit states that belong to the named function. Use source only to confirm a control or route already tied to that function.
+When the user asks to test a page or a function on a page, write this checklist before any page object or spec. Run `scripts/checklist_from_snapshot.py` on the playwright-cli snapshot, then open menus, dialogs, and post-submit states that belong to the named function and include the new controls in the same JSON. Use source only to confirm a control or route already tied to that function. Draft the page object with `scripts/page_object_from_checklist.py` after marking the in-suite items. Summarize the Playwright JSON report with `scripts/summarize_playwright_report.py`.
 
 Each item uses this shape:
 
@@ -233,7 +233,7 @@ Generated tests must include assertions for the intended business result. Review
 
 Use commands matching the project's package manager. A useful sequence is:
 
-1. When the user asked to test a page or a function on a page, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first and drive the page with snapshot refs.
+1. When the user asked to test a page or a function on a page, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`.
 2. List or compile-discover tests.
 3. Run the new or changed spec on Chromium.
 4. Classify failures before rerunning. Repair test-code or harness defects and rerun only the affected test or spec.

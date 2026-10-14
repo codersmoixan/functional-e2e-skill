@@ -1,6 +1,6 @@
 ---
 name: playwright-test-automation
-description: Initialize or extend a repository-native Playwright Test scaffold, then optionally author, run, and diagnose maintainable end-to-end tests with durable reports. When the user asks to test a page or a function on a page, first open it with playwright-cli and generate a functional checklist from the visible controls, then write that page's page object and specs from the checklist and continue the run. When this skill opens or drives a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). Use for the first setup step of persistent browser automation or later regression work; use browser-functional-testing for one-off exploratory testing without committed test code.
+description: Initialize or extend a repository-native Playwright Test scaffold, then optionally author, run, and diagnose maintainable end-to-end tests with durable reports. When the user asks to test a page or a function on a page, first open it with playwright-cli and generate a functional checklist from the visible controls, then write that page's page object and specs from the checklist and continue the run. Use the bundled scripts in scripts/ to draft the checklist, page object, and report counts. When this skill opens or drives a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). Use for the first setup step of persistent browser automation or later regression work; use browser-functional-testing for one-off exploratory testing without committed test code.
 ---
 
 # Playwright Test Automation
@@ -56,7 +56,7 @@ For live or shared targets, request economy and safe sequencing take priority ov
 Skip this section in initialize mode. When the user asks to test a page or a function on a page, complete this section before writing a page object, a spec, or running tests. Read [implementation-guide.md](references/implementation-guide.md) for the checklist contract.
 
 1. Open that page with playwright-cli and take a snapshot. Follow [playwright-cli.md](references/playwright-cli.md) before the first browser command.
-2. Build the checklist from the snapshot and from source that belongs to the named function. Include the visible buttons, inputs, links, and states that function uses.
+2. Draft the checklist with the bundled snapshot script in [Bundled helpers](#bundled-helpers). Keep the visible buttons, inputs, links, and states that belong to the named function. Use source only to confirm a control already tied to that function.
 3. Give each item a precondition, an action, and the expected visible result. Each action gets a success path. Add a validation or failure path when that result is visible on the page or the user stated it. One representative case covers inputs that share the same result.
 4. Open menus, dialogs, and post-submit states that belong to the named function, then add the controls they reveal. List any state that was not opened as not yet covered.
 5. Keep controls and expected results to what was observed or what the user stated. Ask only when a named function has no observable result to assert.
@@ -80,7 +80,7 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 Skip this section in initialize mode. An empty configured test directory is preferable to invented examples or placeholder tests.
 
 - Derive tests from requirements, the running application, and relevant source routes or components. Discover flows and locators with playwright-cli, including its test-generation flow when a live page is needed. Review and rewrite generated output before treating it as a maintained test.
-- For every page a test opens, write or extend one page object before the spec. Read [implementation-guide.md](references/implementation-guide.md) for the page-object contract. Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`.
+- For every page a test opens, draft or extend one page object before the spec. Draft it with the bundled page-object script, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`. Merge the draft into an existing page object.
 - Put navigation, locators, and user actions on the page object. Keep assertions in the spec. Do not copy those selectors back into the spec, and do not invent controls that were not observed on the page or in source.
 - Assert user-visible outcomes, not implementation details. A completed click or navigation is not sufficient without an observable expectation.
 - Prefer `getByRole`, `getByLabel`, `getByText`, and explicit test IDs. Avoid brittle CSS/XPath chains unless no stable user-facing contract exists.
@@ -115,7 +115,7 @@ After the run, provide:
 - the functional checklist and any state left not yet covered, when this request tested a page or a function;
 - the exact environment and command used;
 - created or changed test files;
-- passed, failed, flaky, skipped, blocked, and not-run counts;
+- passed, failed, flaky, skipped, blocked, and not-run counts, using the bundled report script for the Playwright JSON file;
 - application defects with reproduction steps and evidence;
 - test-infrastructure failures separately from product failures;
 - links to the HTML report and relevant trace, screenshot, video, JSON, or JUnit artifacts;
@@ -130,3 +130,25 @@ For initialize-only work, report instead:
 - whether dependency resolution, Playwright configuration loading, and test discovery were verified;
 - anything intentionally deferred, especially browser installation, credentials, business specs, application startup, and CI integration;
 - the exact next command for authoring or running the first test.
+
+## Bundled helpers
+
+Run these scripts from the directory that contains this `SKILL.md`. Do not reimplement them in the target repository, and do not copy them into that repository.
+
+```bash
+python3 scripts/checklist_from_snapshot.py \
+  --function "<function>" \
+  --page "<url-or-route>" \
+  --snapshot <snapshot.yml> \
+  --json <checklist.json>
+
+python3 scripts/page_object_from_checklist.py \
+  --json <checklist.json> \
+  --class-name <PageClass> \
+  --route <route>
+
+python3 scripts/summarize_playwright_report.py \
+  --json <playwright-results.json>
+```
+
+After the checklist script, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items and refuses to overwrite an existing file. Review its locators and method names before saving. The report script supplies Playwright counts and artifact paths. Classify blocked and not-run cases outside that file.
