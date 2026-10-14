@@ -1,4 +1,4 @@
 interface:
   display_name: "playwright-test-automation"
-  short_description: "初始化 Playwright Test 脚手架，并按需生成、运行和诊断端到端测试；测试页面功能时先用内置脚本根据页面生成功能清单，再写 PO 并继续执行；打开浏览器时使用 playwright-cli"
+  short_description: "初始化 Playwright Test 脚手架，并按需生成、运行和诊断端到端测试；首次测试页面时生成功能清单和 PO，已有用例或再次执行时直接复用；打开浏览器时使用 playwright-cli"
   default_prompt: "使用 $playwright-test-automation 为当前 Web 项目初始化可验证、可扩展的 Playwright Test 测试脚手架。"

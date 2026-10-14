@@ -154,7 +154,9 @@ Change the URL, command, package manager, projects, and artifact choices to matc
 
 ## Functional checklist
 
-When the user asks to test a page or a function on a page, write this checklist before any page object or spec. Run `scripts/checklist_from_snapshot.py` on the playwright-cli snapshot, then open menus, dialogs, and post-submit states that belong to the named function and include the new controls in the same JSON. Use source only to confirm a control or route already tied to that function. Draft the page object with `scripts/page_object_from_checklist.py` after marking the in-suite items. Summarize the Playwright JSON report with `scripts/summarize_playwright_report.py`.
+Create this checklist the first time a page or function is tested, before its page object and specs. On a later run, reuse the existing checklist and specs. Append controls that a new snapshot shows and the checklist does not already contain. Regenerate the whole checklist only when the user explicitly asks. When the user supplies specs, run those specs and do not create a checklist for that run.
+
+Run `scripts/checklist_from_snapshot.py` only for a new checklist or for controls being appended. Open menus, dialogs, and post-submit states that belong to the named function and include the new controls in the same JSON. Use source only to confirm a control or route already tied to that function. Draft a missing page object with `scripts/page_object_from_checklist.py` after marking the in-suite items. Extend an existing page object for appended controls or a stale locator. Summarize the Playwright JSON report with `scripts/summarize_playwright_report.py`.
 
 Each item uses this shape:
 
@@ -174,14 +176,14 @@ Coverage: in suite | not yet covered
 - A success path is required for each action. A validation or failure path is required when the page shows that outcome or the user stated it.
 - Repeated inputs with the same visible result become one item. A login function therefore gets one valid submission, client-side empty or malformed validation when that message is visible, and one valid-format rejected account when that response is visible.
 - After the checklist exists, the page object and specs implement the items marked `in suite`. Items left `not yet covered` stay in the report.
-- Initialization does not create a checklist. A user-supplied spec does not get a checklist. A later run reuses the checklist for that page and function, and extends it only for a newly observed control that the function uses or when the user asks to regenerate it.
+- Initialization does not create a checklist.
 
 ## Page objects
 
-Whenever authoring or extending a test that opens a page, write that page's page object in the same change, before relying on selectors in the spec.
+When the first specs for a page are written, create that page's page object in the same change. When specs already exist, reuse the page object. Create a missing one from the controls those specs use, and change an existing one only to add a new control or repair a stale locator.
 
 - One class per page. Name the file from the page, such as `tests/pages/profile.page.ts` for `/profile`. Match an existing page-object directory and naming style when the repository already has one.
-- If a page object for that page already exists, extend it with the locators and actions this test needs and the class does not already provide. Do not create a second class, regenerate the whole class, or overwrite the file. A repeated run that needs no new action leaves the page object unchanged. User-supplied specs are not rewritten into a new page object.
+- If a page object for that page already exists, extend it with the locators and actions this test needs. Do not create a second class for the same page.
 - The page object owns `goto`, locators, and user actions such as filling a form or submitting. The spec owns test data and assertions.
 - Locators must come from the live page, via playwright-cli, or from the page's source. Do not add controls that were not observed.
 - Initialization alone does not create page objects.
@@ -233,7 +235,7 @@ Generated tests must include assertions for the intended business result. Review
 
 Use commands matching the project's package manager. A useful sequence is:
 
-1. When the user asked to test a page or a function on a page, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`.
+1. When this page has no specs yet, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`. When specs already exist, run them and reuse the checklist and page object.
 2. List or compile-discover tests.
 3. Run the new or changed spec on Chromium.
 4. Classify failures before rerunning. Repair test-code or harness defects and rerun only the affected test or spec.
