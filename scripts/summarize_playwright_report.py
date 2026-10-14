@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Count Playwright JSON reporter results and list failure artifacts.
+"""Count Playwright JSON or Allure summary.json results.
 
 Called by the playwright-test-automation skill. Do not copy this script into
-the target repository. Blocked and not-run cases that never entered Playwright
+the target repository. Blocked and not-run cases that never entered the runner
 stay in the caller's report; this script only reads the JSON file.
 """
 
@@ -85,6 +85,27 @@ def render(summary: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def is_allure_summary(document: dict) -> bool:
+    return isinstance(document.get("statistic"), dict) and "reportName" in document
+
+
+def render_allure(document: dict, source: Path) -> str:
+    stats = document.get("statistic") or {}
+    lines = [
+        f"passed: {stats.get('passed', 0)}",
+        f"failed: {stats.get('failed', 0)}",
+        f"broken: {stats.get('broken', 0)}",
+        f"skipped: {stats.get('skipped', 0)}",
+        f"unknown: {stats.get('unknown', 0)}",
+        f"total: {stats.get('total', 0)}",
+    ]
+    if source.parent.name == "widgets":
+        index = source.parent.parent / "index.html"
+        if index.is_file():
+            lines.append(f"report: {index}")
+    return "\n".join(lines) + "\n"
+
+
 def self_test() -> None:
     document = {
         "suites": [
@@ -127,6 +148,16 @@ def self_test() -> None:
     text = render(summary)
     assert "screenshot: test-results/shot.png" in text
     assert "heading missing" in text
+    allure_text = render_allure(
+        {
+            "reportName": "Allure Report",
+            "statistic": {"failed": 0, "broken": 0, "skipped": 0, "passed": 3, "unknown": 0, "total": 3},
+        },
+        Path("reports/allure-report/widgets/summary.json"),
+    )
+    assert "passed: 3" in allure_text
+    assert "broken: 0" in allure_text
+    assert "total: 3" in allure_text
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,7 +180,10 @@ def main() -> int:
         print(f"report JSON not found: {args.json_in}", file=sys.stderr)
         return 1
     document = json.loads(args.json_in.read_text(encoding="utf-8"))
-    sys.stdout.write(render(summarize(document)))
+    if is_allure_summary(document):
+        sys.stdout.write(render_allure(document, args.json_in))
+    else:
+        sys.stdout.write(render(summarize(document)))
     return 0
 
 

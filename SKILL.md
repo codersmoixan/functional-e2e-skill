@@ -36,7 +36,7 @@ Read the matching guide only when the task needs it:
 
 For author, run, or full-workflow modes, use **smoke** by default unless the user asks for broader regression or CI coverage. Initialization alone has no execution profile unless runner settings depend on a requested target.
 
-- **Smoke:** Chromium, terminal plus HTML and JSON reporting, and no redundant data variants. Run the final relevant suite once. When specs already implement the checklist, run those specs. Create specs from the checklist only when this page has none yet. Otherwise use the smallest set of behaviorally distinct scenarios.
+- **Smoke:** Chromium, no redundant data variants, and an Allure report. Run the final relevant suite once. When specs already implement the checklist, run those specs. Create specs from the checklist only when this page has none yet. Otherwise use the smallest set of behaviorally distinct scenarios.
 - **Regression:** the project's configured browsers or devices and a broader set of meaningful scenarios.
 - **CI:** the repository's CI settings, retries, reporters, sharding, and artifact conventions.
 
@@ -74,7 +74,7 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 - Prefer an existing test directory. For a new suite, use `tests/e2e/` unless repository conventions suggest another location.
 - Create or update `playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
 - Add non-conflicting package scripts for running the suite and opening its report when useful.
-- Ignore generated report and artifact directories in version control. Never ignore the specs or configuration.
+- Ignore generated report and artifact directories in version control, including `reports/allure-results/` and `reports/allure-report/`. Never ignore the specs or configuration.
 - Put secrets in environment variables and keep authentication state or credential files out of version control.
 - In smoke mode, install only a missing Chromium binary. Do not install additional browsers unless the selected profile needs them.
 - In initialize-only mode, do not download browser binaries unless they are required for a user-requested smoke execution. Dependency installation and browser installation are separate steps; report either one as blocked rather than pretending the scaffold is verified.
@@ -87,6 +87,7 @@ Skip this section in initialize mode. An empty configured test directory is pref
 - Draft a page object when this page has none, or extend the existing one for new controls or a stale locator. Use the bundled page-object script for a new draft, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`. Merge the draft into an existing page object.
 - Put navigation, locators, and user actions on the page object. Keep assertions in the spec. Do not copy those selectors back into the spec, and do not invent controls that were not observed on the page or in source.
 - Assert user-visible outcomes, not implementation details. A completed click or navigation is not sufficient without an observable expectation.
+- Record each new case so the Allure report can show it: a title for the visible outcome, epic, feature, story, and severity. Wrap the page open, the action, and the assertion in named steps. On the assertion step, attach a named full-page screenshot. Attach an API body or resulting URL when that evidence exists, after redacting passwords and tokens. Read [implementation-guide.md](references/implementation-guide.md) for the report contract.
 - Prefer `getByRole`, `getByLabel`, `getByText`, and explicit test IDs. Avoid brittle CSS/XPath chains unless no stable user-facing contract exists.
 - Use awaited web-first assertions such as `await expect(locator).toBeVisible()` so Playwright can retry until the expected state is reached.
 - Keep tests isolated. Do not make one test depend on another test's execution order or persisted browser state. Control or uniquely namespace test data and clean it up when safe.
@@ -112,17 +113,19 @@ An unexecuted or blocked test is never a pass. If a retry passes after an earlie
 
 ## Produce the report
 
-For local smoke and regression runs, configure concise terminal output, an HTML report, and JSON results. Add JUnit only for CI integration or when the user asks for it. Retain screenshots, video, and traces according to failure-oriented settings, but protect authentication secrets and avoid unnecessary artifact cost.
+After every executed run, publish an Allure report and keep authentication secrets out of it. Read [implementation-guide.md](references/implementation-guide.md) for the directory layout and the fields each case must contain. Reuse the repository's existing Allure command and directories when they already match that layout.
+
+Write `reports/allure-results/environment.properties` before generation. Generate the HTML report with `allure generate reports/allure-results -o reports/allure-report --clean`. After generation succeeds, open that report with a local server in the background: `allure open reports/allure-report`. Use `npx allure` when the global `allure` command is missing, and add `allure-commandline` only when neither is available. Record the `http://127.0.0.1` URL the server prints. A Playwright Test project writes results with `allure-playwright`. A pytest project writes them with `pytest --alluredir=reports/allure-results`.
 
 After the run, provide:
 
 - the functional checklist and any state left not yet covered, when this request tested a page or a function;
 - the exact environment and command used;
 - created or changed test files;
-- passed, failed, flaky, skipped, blocked, and not-run counts, using the bundled report script for the Playwright JSON file;
+- passed, failed, broken, skipped, blocked, and not-run counts, using the bundled report script on `reports/allure-report/widgets/summary.json`;
 - application defects with reproduction steps and evidence;
 - test-infrastructure failures separately from product failures;
-- links to the HTML report and relevant trace, screenshot, video, JSON, or JUnit artifacts;
+- the local server URL from `allure open`, plus relevant screenshots and text attachments inside that report;
 - explicitly untested scope.
 
 Say “the executed scenarios passed,” never “the application is bug-free.”
@@ -155,4 +158,4 @@ python3 scripts/summarize_playwright_report.py \
   --json <playwright-results.json>
 ```
 
-Run the checklist and page-object scripts only when creating the first checklist or appending controls that were not already listed. On a later run, or when the user supplied specs, skip both scripts unless a page object is missing, a locator is stale, or the user asked to regenerate the checklist. After a new checklist script run, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items and refuses to overwrite an existing file. Review its locators and method names before saving. The report script supplies Playwright counts and artifact paths. Classify blocked and not-run cases outside that file.
+Run the checklist and page-object scripts only when creating the first checklist or appending controls that were not already listed. On a later run, or when the user supplied specs, skip both scripts unless a page object is missing, a locator is stale, or the user asked to regenerate the checklist. After a new checklist script run, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items and refuses to overwrite an existing file. Review its locators and method names before saving. The report script reads either Playwright JSON or `reports/allure-report/widgets/summary.json`. Use the Allure summary after generation. Classify blocked and not-run cases outside that file.

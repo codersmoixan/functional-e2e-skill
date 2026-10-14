@@ -99,7 +99,7 @@ package.json                 # existing file with non-conflicting scripts
 .env.example                 # only when configuration needs documented variables
 ```
 
-Do not add a custom runner program when package scripts and the Playwright CLI already provide the required entry points. Do not require Allure by default: Playwright's HTML and JSON reporters are sufficient for the local baseline. Add Allure or JUnit only when the repository, CI platform, or user requires them.
+Do not add a custom runner program when package scripts and the Playwright CLI already provide the required entry points. The human report for an executed run is Allure, generated into `reports/allure-report/`. Add JUnit only for CI integration or when the user asks for it.
 
 ## Configuration decisions
 
@@ -113,7 +113,7 @@ Set configuration from observed project facts:
 - `retries`: normally zero locally and a small number in CI. Retries must not conceal a known deterministic failure.
 - `workers`: respect the application's test-data isolation. Reduce parallelism when tests share unsafe state.
 - `outputDir`: keep screenshots, videos, and traces in a generated artifact directory.
-- `reporter`: provide concise terminal output, a persistent HTML report, and JSON locally. Add JUnit for CI integration or when explicitly requested.
+- `reporter`: concise terminal output plus Allure results in `reports/allure-results`. For Playwright Test, use `allure-playwright`. For pytest, pass `--alluredir=reports/allure-results`. Add JUnit for CI integration or when explicitly requested.
 - `use.trace`: prefer `on-first-retry` when CI retries are enabled or `retain-on-failure` when they are not.
 - `use.screenshot`: prefer `only-on-failure`.
 - `use.video`: prefer `retain-on-failure` when video materially helps and runtime cost is acceptable.
@@ -129,8 +129,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
-    ['json', { outputFile: 'test-results/results.json' }],
+    ['allure-playwright', { resultsDir: 'reports/allure-results' }],
   ],
   outputDir: 'test-results/artifacts',
   use: {
@@ -262,4 +261,38 @@ Separate these categories:
 - Infrastructure failure: the server, browser, dependency, network, or environment could not support execution.
 - Flaky result: repeated executions under the same known conditions disagree.
 
-The HTML report is the primary human artifact. Use JSON or JUnit to calculate counts or integrate with CI, but verify the final summary against the actual runner exit status.
+The Allure report served by `allure open reports/allure-report` is the primary human artifact. Read counts from `reports/allure-report/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status.
+
+## Allure report contract
+
+Produce this layout after every executed run. Reuse an existing Allure setup when the repository already has one.
+
+```text
+reports/
+  allure-results/
+    environment.properties
+    *-result.json
+  allure-report/
+    index.html
+    widgets/summary.json
+```
+
+Generate it with `allure generate reports/allure-results -o reports/allure-report --clean`. Then start `allure open reports/allure-report` in the background so the report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. Write `environment.properties` first, using the real run values:
+
+```text
+Environment=<env>
+BaseURL=<base url>
+Browser=<browser>
+Headless=<true or false>
+Runtime.Version=<python or node version>
+```
+
+Each case in the report needs:
+
+- a title that states the visible outcome;
+- labels for epic, feature, story, and severity, plus a smoke tag when the case is part of the smoke set;
+- steps for opening the page, performing the action, and checking the result, each with its own status;
+- a named full-page screenshot attached on the assertion step;
+- a text attachment for an API body or resulting URL when the case observed one, with passwords and tokens redacted.
+
+Playwright Test records these through `allure-playwright`. pytest records them through `allure-pytest` steps, titles, and attachments. Do not invent a second report format when this layout already exists.
