@@ -174,14 +174,14 @@ Coverage: in suite | not yet covered
 - A success path is required for each action. A validation or failure path is required when the page shows that outcome or the user stated it.
 - Repeated inputs with the same visible result become one item. A login function therefore gets one valid submission, client-side empty or malformed validation when that message is visible, and one valid-format rejected account when that response is visible.
 - After the checklist exists, the page object and specs implement the items marked `in suite`. Items left `not yet covered` stay in the report.
-- Initialization does not create a checklist.
+- Initialization does not create a checklist. A user-supplied spec does not get a checklist. A later run reuses the checklist for that page and function, and extends it only for a newly observed control that the function uses or when the user asks to regenerate it.
 
 ## Page objects
 
 Whenever authoring or extending a test that opens a page, write that page's page object in the same change, before relying on selectors in the spec.
 
 - One class per page. Name the file from the page, such as `tests/pages/profile.page.ts` for `/profile`. Match an existing page-object directory and naming style when the repository already has one.
-- If a page object for that page already exists, extend it with the locators and actions this test needs. Do not create a second class for the same page.
+- If a page object for that page already exists, extend it with the locators and actions this test needs and the class does not already provide. Do not create a second class, regenerate the whole class, or overwrite the file. A repeated run that needs no new action leaves the page object unchanged. User-supplied specs are not rewritten into a new page object.
 - The page object owns `goto`, locators, and user actions such as filling a form or submitting. The spec owns test data and assertions.
 - Locators must come from the live page, via playwright-cli, or from the page's source. Do not add controls that were not observed.
 - Initialization alone does not create page objects.

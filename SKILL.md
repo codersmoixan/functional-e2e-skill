@@ -1,6 +1,6 @@
 ---
 name: playwright-test-automation
-description: Initialize or extend a repository-native Playwright Test scaffold, then optionally author, run, and diagnose maintainable end-to-end tests with durable reports. When the user asks to test a page or a function on a page, first open it with playwright-cli and generate a functional checklist from the visible controls, then write that page's page object and specs from the checklist and continue the run. Use the bundled scripts in scripts/ to draft the checklist, page object, and report counts. When this skill opens or drives a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). Use for the first setup step of persistent browser automation or later regression work; use browser-functional-testing for one-off exploratory testing without committed test code.
+description: Initialize or extend a repository-native Playwright Test scaffold, then optionally author, run, and diagnose maintainable end-to-end tests with durable reports. When the user asks to test a page or a function on a page and no spec already covers it, first open it with playwright-cli and generate a functional checklist from the visible controls, then write that page's page object and specs from the checklist and continue the run. When the user supplies specs, or the same page and function already have a checklist, page object, and spec, reuse them and run those specs. Use the bundled scripts in scripts/ to draft a missing checklist, page object, and report counts. When this skill opens or drives a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). Use for the first setup step of persistent browser automation or later regression work; use browser-functional-testing for one-off exploratory testing without committed test code.
 ---
 
 # Playwright Test Automation
@@ -12,11 +12,21 @@ Build a repository-native Playwright Test setup and prove that the scaffold is u
 Infer the narrowest mode that completes the request:
 
 - **Initialize:** inspect the repository; create or minimally extend the Playwright Test harness; add the required dependency, configuration, scripts, artifact directories or ignores, and an environment-variable example when needed; then validate configuration and test discovery. Do not generate business-specific page objects, credentials, data, selectors, or expectations without evidence. Do not run the application or a browser test unless the user asked for execution or a safe, meaningful target is already available.
-- **Author:** initialize first when necessary. When the user asks to test a page or a function on a page, generate the functional checklist before creating or extending that page's page object and spec. Specs call the page object and implement the checklist. Add a fixture only when a test uses it.
+- **Author:** initialize first when necessary. When the user supplies specs, or existing specs already cover the requested page and function, reuse them. Otherwise generate the functional checklist before creating or extending that page's page object and spec. New specs call the page object and implement the checklist. Add a fixture only when a test uses it.
 - **Run:** execute an existing suite or the tests just authored, classify failures, make permitted test-harness repairs, and produce reports.
 - **Full workflow:** initialize or extend, author, run, refine, and report when the user explicitly asks for the complete workflow.
 
 For initialize mode, read [implementation-guide.md](references/implementation-guide.md) and follow its scaffold contract. A successful initialization must be idempotent: rerunning it preserves compatible project choices and does not create a second harness or overwrite unrelated configuration.
+
+## Reuse existing coverage
+
+A repeated run for the same page and function reuses the checklist, page object, and spec that already cover it. Generate a missing piece only.
+
+- When the user supplies test cases, those cases are the coverage. Run them. Keep their names, steps, selectors, and assertions. Do not generate a functional checklist, a replacement spec, or a page object for them.
+- When the repository already has a spec for the requested page and function, run that spec. Do not add a second spec for the same visible result.
+- When a checklist for that page and function already exists, reuse it. Take a new snapshot and extend the checklist only if the user asks to regenerate it, or the snapshot shows a control that the named function uses and the checklist does not list.
+- When a page object for that page already exists, keep its methods. Add a locator or action only for an in-suite control it does not already perform. Do not draft a second class or overwrite the file.
+- Create the checklist, page object, and spec only for a requested function that has none of those files yet.
 
 ## Open the browser with playwright-cli
 
@@ -53,7 +63,7 @@ For live or shared targets, request economy and safe sequencing take priority ov
 
 ## Generate the functional checklist first
 
-Skip this section in initialize mode. When the user asks to test a page or a function on a page, complete this section before writing a page object, a spec, or running tests. Read [implementation-guide.md](references/implementation-guide.md) for the checklist contract.
+Skip this section in initialize mode, when the user supplied the specs, and when an existing checklist already covers the requested page and function. Complete it before writing a new page object or spec. Read [implementation-guide.md](references/implementation-guide.md) for the checklist contract.
 
 1. Open that page with playwright-cli and take a snapshot. Follow [playwright-cli.md](references/playwright-cli.md) before the first browser command.
 2. Draft the checklist with the bundled snapshot script in [Bundled helpers](#bundled-helpers). Keep the visible buttons, inputs, links, and states that belong to the named function. Use source only to confirm a control already tied to that function.
@@ -80,7 +90,7 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 Skip this section in initialize mode. An empty configured test directory is preferable to invented examples or placeholder tests.
 
 - Derive tests from requirements, the running application, and relevant source routes or components. Discover flows and locators with playwright-cli, including its test-generation flow when a live page is needed. Review and rewrite generated output before treating it as a maintained test.
-- For every page a test opens, draft or extend one page object before the spec. Draft it with the bundled page-object script, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`. Merge the draft into an existing page object.
+- For a new spec, draft or extend one page object before writing it. Draft a missing page object with the bundled page-object script, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`. When the class already exists, add only missing in-suite actions. User-supplied specs keep their own structure.
 - Put navigation, locators, and user actions on the page object. Keep assertions in the spec. Do not copy those selectors back into the spec, and do not invent controls that were not observed on the page or in source.
 - Assert user-visible outcomes, not implementation details. A completed click or navigation is not sufficient without an observable expectation.
 - Prefer `getByRole`, `getByLabel`, `getByText`, and explicit test IDs. Avoid brittle CSS/XPath chains unless no stable user-facing contract exists.
