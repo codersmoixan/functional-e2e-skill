@@ -283,7 +283,7 @@ Separate these categories:
 - Infrastructure failure: the server, browser, dependency, network, or environment could not support execution.
 - Flaky result: repeated executions under the same known conditions disagree.
 
-The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status.
+The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status. In the user-facing summary, also state the wall-clock time from the start of the skill invocation through report generation and opening. That total is separate from the test duration inside the Allure report.
 
 ## Allure report contract
 

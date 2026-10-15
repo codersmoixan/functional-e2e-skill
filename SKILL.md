@@ -7,6 +7,8 @@ description: Initialize or extend a repository-native Playwright Test scaffold, 
 
 Build a repository-native Playwright Test setup and prove that the scaffold is usable. Initialization is a complete mode of its own: when the user asks only to initialize the test scaffold, stop after the harness is configured and validated instead of inventing application-specific scenarios. When the request includes test authoring or execution, continue through durable test cases, execution artifacts, diagnosis, and an evidence-backed summary.
 
+Record the wall-clock start when this skill begins, before the first inspection or command. When the flow ends, including a blocked or initialize-only finish and after the Allure report is generated and opened, tell the user the total elapsed time. Include inspection, browser setup, authoring, execution, diagnosis, report generation, and opening the report. State it as hours, minutes, and seconds, omitting a unit that is zero, such as `4m 12s` or `1h 3m 20s`. This total is separate from the duration Allure records for the tests alone.
+
 ## Choose the operation mode
 
 Infer the narrowest mode that completes the request:
@@ -160,7 +162,8 @@ After the run, provide:
 - application defects with reproduction steps and evidence;
 - test-infrastructure failures separately from product failures;
 - the local server URL from `allure open`, plus relevant screenshots and text attachments inside that report;
-- explicitly untested scope.
+- explicitly untested scope;
+- the total elapsed time from the start of this skill invocation to this summary.
 
 Say “the executed scenarios passed,” never “the application is bug-free.”
 
@@ -170,7 +173,8 @@ For initialize-only work, report instead:
 - created or changed scaffold files and package scripts;
 - whether dependency resolution, Playwright configuration loading, and test discovery were verified;
 - anything intentionally deferred, especially browser installation, credentials, business specs, application startup, and CI integration;
-- the exact next command for authoring or running the first test.
+- the exact next command for authoring or running the first test;
+- the total elapsed time from the start of this skill invocation to this summary.
 
 ## Bundled helpers
 
