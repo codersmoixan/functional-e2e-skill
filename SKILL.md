@@ -1,13 +1,23 @@
 ---
 name: playwright-test-automation
-description: Initialize or extend a repository-native Playwright Test scaffold, then optionally author, run, and diagnose maintainable end-to-end tests with durable reports. The first time a page is tested, open it with playwright-cli, generate a functional checklist, then write its page object and specs. When the user supplies specs, or that page already has a checklist, page object, and specs, run those specs immediately. Skip guide reading, checklist comparison, and playwright-cli until that attempt fails. After one failure, run the diagnosis flow once, repair a stale locator or recheck the failing control, and rerun only the affected spec. Recompare the whole checklist before a run only when the user explicitly asks, or explicitly says controls were added, removed, or changed. Use the bundled scripts in scripts/ for a new checklist, page-object draft, and report counts. When opening a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). Use for persistent browser automation setup or later regression work; use browser-functional-testing for one-off exploratory testing without committed test code.
+description: Initialize or extend a repository-native Playwright Test scaffold, then author, run, and diagnose maintainable end-to-end tests with a generated Allure report. The first time a page is tested, open it with playwright-cli, generate a functional checklist, then write its page object and specs. When the user supplies specs, or that page already has a checklist, page object, and specs, run those specs immediately. Skip guide reading, checklist comparison, and playwright-cli until that attempt fails. After one failure, run the diagnosis flow once, repair a stale locator or recheck the failing control, and rerun only the affected spec. Recompare the whole checklist before a run only when the user explicitly asks, or explicitly says controls were added, removed, or changed. Use the bundled scripts in scripts/ for a new checklist, page-object draft, and report counts. When opening a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). When the user asks to test a page, flow, or function, always write or reuse the page object and spec, run that spec, generate the Allure report, and open it. A browser-only pass does not finish the request. Do not switch to browser-functional-testing because the user said “测一下” or did not name Playwright.
 ---
 
 # Playwright Test Automation
 
 Build a repository-native Playwright Test setup and prove that the scaffold is usable. Initialization is a complete mode of its own: when the user asks only to initialize the test scaffold, stop after the harness is configured and validated instead of inventing application-specific scenarios. When the request includes test authoring or execution, continue through durable test cases, execution artifacts, diagnosis, and an evidence-backed summary.
 
-Record the wall-clock start when this skill begins, before the first inspection or command. When the flow ends, including a blocked or initialize-only finish and after the Allure report is generated and opened, tell the user the total elapsed time. Include inspection, browser setup, authoring, execution, diagnosis, report generation, and opening the report. State it as hours, minutes, and seconds, omitting a unit that is zero, such as `4m 12s` or `1h 3m 20s`. This total is separate from the duration Allure records for the tests alone.
+## Required artifacts
+
+A request to test a page, flow, or function is not finished until all three exist for that run:
+
+1. `tests/pages/<page-name>.page.ts` — create it the first time that page is tested, or extend the existing page object.
+2. `tests/e2e/<function>/<function>.spec.ts` — create it the first time that function is tested, or run the existing spec.
+3. `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` — this run's Allure report. Generate it with `allure generate` from this run's `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`, then open it with `allure open`. The user-facing summary must include the printed `http://127.0.0.1` URL.
+
+必须生成 Allure 报告。Stopping after playwright-cli, a manual browser walkthrough, or a Playwright run that was not turned into `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` is a failed skill run. “测一下” and “看一下功能” still require the page object, the spec, and the opened Allure report. The only exception is an initialize-only request that asks solely to scaffold the harness and does not ask to test a page or function: do not invent business specs, and do not generate an Allure report for scenarios that were not executed.
+
+Record the wall-clock start when this skill begins, before the first inspection or command. When the flow ends, including a blocked or initialize-only finish and after the Allure report is generated and opened, write this invocation's user prompt, then tell the user the total elapsed time. Include inspection, browser setup, authoring, execution, diagnosis, report generation, opening the report, and writing the prompt. State it as hours, minutes, and seconds, omitting a unit that is zero, such as `4m 12s` or `1h 3m 20s`. This total is separate from the duration Allure records for the tests alone.
 
 ## Choose the operation mode
 
@@ -109,7 +119,7 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 - Prefer an existing test directory. For a new suite, use `tests/e2e/` unless repository conventions suggest another location.
 - Create or update `playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
 - Add non-conflicting package scripts for running the suite and opening its report when useful.
-- Ignore generated report and artifact directories in version control, including `reports/allure-results/` and `reports/allure-report/`. Never ignore the specs or configuration.
+- Ignore generated report and artifact directories in version control, including `reports/allure-results/`, `reports/allure-report/`, and `reports/prompts/`. Never ignore the specs or configuration.
 - Put secrets in environment variables and keep authentication state or credential files out of version control. Ignore the saved-login file, such as `.auth/`.
 - In smoke mode, install only a missing Chromium binary. Do not install additional browsers unless the selected profile needs them.
 - In initialize-only mode, do not download browser binaries unless they are required for a user-requested smoke execution. Dependency installation and browser installation are separate steps; report either one as blocked rather than pretending the scaffold is verified.
@@ -162,10 +172,13 @@ After the run, provide:
 - application defects with reproduction steps and evidence;
 - test-infrastructure failures separately from product failures;
 - the local server URL from `allure open`, plus relevant screenshots and text attachments inside that report;
+- the path of this invocation's prompt file;
 - explicitly untested scope;
 - the total elapsed time from the start of this skill invocation to this summary.
 
 Say “the executed scenarios passed,” never “the application is bug-free.”
+
+Before that summary, save the user prompt that invoked this skill. Use the same `<function>-<YYYYMMDD-HHMMSS>` name already chosen for this run's Allure directories, including when report generation was blocked after that name was chosen. Write it to `reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md`. The file body is that prompt verbatim: the user message that started this invocation, not a paraphrase, and not later turns. An initialize-only finish, or a finish blocked before a feature name exists, uses `初始化` as `<function>` and the local time at the end of the run. Ignore `reports/prompts/` in version control.
 
 For initialize-only work, report instead:
 
@@ -174,6 +187,7 @@ For initialize-only work, report instead:
 - whether dependency resolution, Playwright configuration loading, and test discovery were verified;
 - anything intentionally deferred, especially browser installation, credentials, business specs, application startup, and CI integration;
 - the exact next command for authoring or running the first test;
+- the path of this invocation's prompt file;
 - the total elapsed time from the start of this skill invocation to this summary.
 
 ## Bundled helpers

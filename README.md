@@ -58,6 +58,7 @@ tests/
 reports/
   allure-results/<function>-<YYYYMMDD-HHMMSS>/
   allure-report/<function>-<YYYYMMDD-HHMMSS>/
+  prompts/<function>-<YYYYMMDD-HHMMSS>.md
 ```
 
 Page objects stay under `tests/pages/` so several features can share a page. Login state stays in `.auth/` and is reused by the next authenticated feature. If that state is missing or the site returns to the login page, the skill signs in once and refreshes the file. A test whose subject is login still performs the login steps.
@@ -65,6 +66,8 @@ Page objects stay under `tests/pages/` so several features can share a page. Log
 ## Reports and screenshots
 
 Each run gets a new results directory and a matching report directory, named with the feature and the local time, for example `reports/allure-report/登录-20261014-175800/`. Earlier runs are left in place. After generation, `allure open` serves that report and the summary includes the printed `http://127.0.0.1` URL.
+
+When the run ends, the prompt that invoked the skill is saved under the same name, for example `reports/prompts/登录-20261014-175800.md`. That file is the user message verbatim. An initialize-only finish uses `初始化` instead of a feature name. `reports/prompts/` is not committed.
 
 Screenshots and the browser viewport default to 1920×1080, including every image in the Allure report. State another size in the request when you want one, for example `1440×900`. Ask for one screenshot per completed flow when you only want an image after the flow's final assertion:
 

@@ -283,11 +283,11 @@ Separate these categories:
 - Infrastructure failure: the server, browser, dependency, network, or environment could not support execution.
 - Flaky result: repeated executions under the same known conditions disagree.
 
-The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status. In the user-facing summary, also state the wall-clock time from the start of the skill invocation through report generation and opening. That total is separate from the test duration inside the Allure report.
+The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status. In the user-facing summary, also state the wall-clock time from the start of the skill invocation through report generation, opening, and writing this invocation's prompt file. That total is separate from the test duration inside the Allure report.
 
 ## Allure report contract
 
-Produce this layout after every executed run. Choose one `<function>-<YYYYMMDD-HHMMSS>` name and use it for both directories. Earlier runs stay in their own directories.
+Produce this layout after every executed run. Choose one `<function>-<YYYYMMDD-HHMMSS>` name and use it for both report directories and the prompt file. Earlier runs stay in their own directories.
 
 ```text
 reports/
@@ -301,9 +301,13 @@ reports/
     <function>-<YYYYMMDD-HHMMSS>/
       index.html
       widgets/summary.json
+  prompts/
+    <function>-<YYYYMMDD-HHMMSS>.md
 ```
 
-`<function>` is the feature just tested, such as `登录`. Remove spaces and path separators. When this run covers more than one feature, join those names with `-`. The directory name contains that feature text and is not only digits. An example pair is `reports/allure-results/登录-20261014-175800/` and `reports/allure-report/登录-20261014-175800/`.
+`<function>` is the feature just tested, such as `登录`. Remove spaces and path separators. When this run covers more than one feature, join those names with `-`. The directory name contains that feature text and is not only digits. An example pair is `reports/allure-results/登录-20261014-175800/` and `reports/allure-report/登录-20261014-175800/`. The prompt file for that same run is `reports/prompts/登录-20261014-175800.md`.
+
+When the flow ends, write `reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md` with the same name as this run's report directories. The body is the user message that invoked this skill, copied verbatim. Do not paraphrase it and do not append later conversation. If the run ends before a feature name exists, use `初始化` and the local time at the end. Keep `reports/prompts/` out of version control.
 
 Write `environment.properties` into the results directory before generation. Generate with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `reports/allure-results/` or `reports/allure-report/` themselves. Then start `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
 
