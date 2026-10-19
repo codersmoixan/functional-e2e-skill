@@ -27,7 +27,7 @@
 ```
 
 ```text
-使用 playwright-test-automation 运行 tests/e2e/新增地址/新增地址.spec.ts。
+使用 playwright-test-automation 运行 qa/functional/tests/e2e/新增地址/新增地址.spec.ts。
 ```
 
 ```text
@@ -41,7 +41,7 @@
 ## 一次测试请求会怎么走
 
 1. **你提供了用例。** 直接跑这些用例，场景和断言保持不变。只有缺少 Page Object 时才补一个；只有失败是定位器过期时才改定位器。
-2. **`tests/e2e/<功能>/` 里已经有清单、用例和页面对象。** 直接跑这一份。开跑前不读技能参考、不读清单全文、也不打开页面对照控件。这一次失败之后，才进入一次诊断：产品缺陷就停在失败证据上；定位器过期或找不到控件时，才打开页面核对失败的那个控件，修好页面对象，并只重跑受影响的用例。只有你明确说「重新对照清单」，或明确说控件有新增、删除或改动，才在开跑前打开页面。只有你明确说「重新生成清单」时才整份重做。功能名要和文件夹名一致，才会命中同一份用例。
+2. **`qa/functional/tests/e2e/<功能>/` 里已经有清单、用例和页面对象。** 直接跑这一份。开跑前不读技能参考、不读清单全文、也不打开页面对照控件。这一次失败之后，才进入一次诊断：产品缺陷就停在失败证据上；定位器过期或找不到控件时，才打开页面核对失败的那个控件，修好页面对象，并只重跑受影响的用例。只有你明确说「重新对照清单」，或明确说控件有新增、删除或改动，才在开跑前打开页面。只有你明确说「重新生成清单」时才整份重做。功能名要和文件夹名一致，才会命中同一份用例。
 3. **这个功能还没有用例。** 打开页面，写入功能清单，再写 Page Object 和用例并执行。
 
 只说「初始化」时，配好脚手架并确认测试能被发现后就停。不会打开页面，也不会编造业务用例。
@@ -49,25 +49,27 @@
 ## 会写出的文件
 
 ```text
-tests/
-  e2e/<功能>/
-    checklist.json
-    <功能>.spec.ts           # pytest 项目使用 test_<功能>.py
-  pages/<page-name>.page.ts
-.auth/<角色>.json             # 已保存的登录态，不提交
-reports/
-  allure-results/<功能>-<YYYYMMDD-HHMMSS>/
-  allure-report/<功能>-<YYYYMMDD-HHMMSS>/
-  prompts/<功能>-<YYYYMMDD-HHMMSS>.md
+qa/functional/
+  playwright.config.ts
+  tests/
+    e2e/<功能>/
+      checklist.json
+      <功能>.spec.ts           # pytest 项目使用 test_<功能>.py
+    pages/<page-name>.page.ts
+  .auth/<角色>.json             # 已保存的登录态，不提交
+  reports/
+    allure-results/<功能>-<YYYYMMDD-HHMMSS>/
+    allure-report/<功能>-<YYYYMMDD-HHMMSS>/
+    prompts/<功能>-<YYYYMMDD-HHMMSS>.md
 ```
 
-Page Object 放在 `tests/pages/`，多个功能可以共用同一个页面。登录态放在 `.auth/`，下一个需要登录的功能会继续用它。登录态缺失，或站点又回到登录页时，才重新登录一次并更新这个文件。专门测试登录的用例仍会走登录步骤。
+Page Object 放在 `qa/functional/tests/pages/`，多个功能可以共用同一个页面。登录态放在 `qa/functional/.auth/`，下一个需要登录的功能会继续用它。登录态缺失，或站点又回到登录页时，才重新登录一次并更新这个文件。专门测试登录的用例仍会走登录步骤。`.env` 留在仓库根目录。
 
 ## 报告和截图
 
-每次运行使用「功能名 + 本地时间」新建一对目录，例如 `reports/allure-report/登录-20261014-175800/`。以前的结果和报告都保留。生成后用 `allure open` 在本地服务中打开这次报告，结果说明里带上终端打印的 `http://127.0.0.1` 地址。
+每次运行使用「功能名 + 本地时间」新建一对目录，例如 `qa/functional/reports/allure-report/登录-20261014-175800/`。以前的结果和报告都保留。生成后用 `allure open` 在本地服务中打开这次报告，结果说明里带上终端打印的 `http://127.0.0.1` 地址。
 
-运行结束时，把这次调用 skill 的用户提示词按同一个名字存下来，例如 `reports/prompts/登录-20261014-175800.md`。文件正文是用户输入的原文。只做初始化时，功能名用 `初始化`。`reports/prompts/` 不提交。
+运行结束时，把这次调用 skill 的用户提示词按同一个名字存下来，例如 `qa/functional/reports/prompts/登录-20261014-175800.md`。文件正文是用户输入的原文。只做初始化时，功能名用 `初始化`。`qa/functional/reports/prompts/` 不提交。
 
 截图和浏览器视口默认是 1920×1080，测试报告里的图也是这个尺寸。调用时可以指定别的分辨率，例如 `1440×900`。如果只想在一条流程结束时截一张，调用时说明：
 

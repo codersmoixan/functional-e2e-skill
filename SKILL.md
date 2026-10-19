@@ -7,15 +7,31 @@ description: Initialize or extend a repository-native Playwright Test scaffold, 
 
 Build a repository-native Playwright Test setup and prove that the scaffold is usable. Initialization is a complete mode of its own: when the user asks only to initialize the test scaffold, stop after the harness is configured and validated instead of inventing application-specific scenarios. When the request includes test authoring or execution, continue through durable test cases, execution artifacts, diagnosis, and an evidence-backed summary.
 
+## Functional project directory
+
+The repository under test is the working directory. On every pass, create `qa/functional` at that repository root when it is missing.
+
+Every functional-test project file this skill generates goes under `qa/functional`, not the repository root `tests/` or `reports/`:
+
+- `qa/functional/playwright.config.*` — create it when the repository has no Playwright config yet. An existing Playwright config outside `qa/functional` is still used; do not start a second harness.
+- `qa/functional/tests/e2e/<function>/` — checklist and spec.
+- `qa/functional/tests/pages/<page-name>.page.ts` — shared page objects.
+- `qa/functional/.auth/` — saved login. Keep it out of version control.
+- `qa/functional/reports/` — Allure results, the HTML report, and this invocation's prompt.
+
+Commands run from the repository root. Pass `--config qa/functional/playwright.config.ts` (or `.js`). Paths inside that config file stay relative to `qa/functional/`. Set `webServer.cwd` to the directory that contains the app start script.
+
+`.env` stays at the repository root. Read credentials and other secrets from that `.env` / `.env.local` or the shell. Do not look for or create `.env` under `qa/functional`.
+
 ## Required artifacts
 
 A request to test a page, flow, or function is not finished until all three exist for that run:
 
-1. `tests/pages/<page-name>.page.ts` — create it the first time that page is tested, or extend the existing page object.
-2. `tests/e2e/<function>/<function>.spec.ts` — create it the first time that function is tested, or run the existing spec.
-3. `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` — this run's Allure report. Generate it with `allure generate` from this run's `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`, then open it with `allure open`. The user-facing summary must include the printed `http://127.0.0.1` URL.
+1. `qa/functional/tests/pages/<page-name>.page.ts` — create it the first time that page is tested, or extend the existing page object.
+2. `qa/functional/tests/e2e/<function>/<function>.spec.ts` — create it the first time that function is tested, or run the existing spec.
+3. `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` — this run's Allure report. Generate it with `allure generate` from this run's `qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`, then open it with `allure open`. The user-facing summary must include the printed `http://127.0.0.1` URL.
 
-必须生成 Allure 报告。Stopping after playwright-cli, a manual browser walkthrough, or a Playwright run that was not turned into `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` is a failed skill run. “测一下” and “看一下功能” still require the page object, the spec, and the opened Allure report. The only exception is an initialize-only request that asks solely to scaffold the harness and does not ask to test a page or function: do not invent business specs, and do not generate an Allure report for scenarios that were not executed.
+必须生成 Allure 报告。Stopping after playwright-cli, a manual browser walkthrough, or a Playwright run that was not turned into `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/` is a failed skill run. “测一下” and “看一下功能” still require the page object, the spec, and the opened Allure report. The only exception is an initialize-only request that asks solely to scaffold the harness and does not ask to test a page or function: do not invent business specs, and do not generate an Allure report for scenarios that were not executed.
 
 Record the wall-clock start when this skill begins, before the first inspection or command. When the flow ends, including a blocked or initialize-only finish and after the Allure report is generated and opened, write this invocation's user prompt, then tell the user the total elapsed time. Include inspection, browser setup, authoring, execution, diagnosis, report generation, opening the report, and writing the prompt. State it as hours, minutes, and seconds, omitting a unit that is zero, such as `4m 12s` or `1h 3m 20s`. This total is separate from the duration Allure records for the tests alone.
 
@@ -32,7 +48,7 @@ For initialize mode, read [implementation-guide.md](references/implementation-gu
 
 ## Existing artifacts run first
 
-When the requested function already has `tests/e2e/<function>/checklist.json`, its spec, and the page object that spec imports, run that spec before any other workflow.
+When the requested function already has `qa/functional/tests/e2e/<function>/checklist.json`, its spec, and the page object that spec imports, run that spec before any other workflow.
 
 Skip all of the following until that attempt has failed:
 
@@ -42,7 +58,7 @@ Skip all of the following until that attempt has failed:
 - playwright-cli, including a snapshot used to compare controls
 - a separate `playwright test --list` or discovery command before the suite
 
-Read only what the command needs: the spec's `storageState` and environment variable names, and in `playwright.config.*` the `baseURL` and Allure `resultsDir`. Before that run, set the spec viewport to the size in [Screenshot size](#screenshot-size) when it differs. Leave the scenarios and assertions in place. Then run the spec once and publish the report using the steps already written in [Produce the report](#produce-the-report).
+Read only what the command needs: the spec's `storageState` and environment variable names, and in `qa/functional/playwright.config.*` the `baseURL` and Allure `resultsDir`. Before that run, set the spec viewport to the size in [Screenshot size](#screenshot-size) when it differs. Leave the scenarios and assertions in place. Then run the spec once and publish the report using the steps already written in [Produce the report](#produce-the-report).
 
 If that attempt fails, run this diagnosis flow once:
 
@@ -90,7 +106,7 @@ For live or shared targets, request economy and safe sequencing take priority ov
 Skip this section when [Existing artifacts run first](#existing-artifacts-run-first) applies and that run has not failed.
 
 - Read repository instructions and inspect the package manager, scripts, framework, existing test directories, Playwright configuration, application start command, target URL, authentication, and data requirements.
-- Preserve an existing Playwright layout and conventions. Extend it rather than initializing a second suite or overwriting configuration.
+- Preserve the repository's language, package manager, and an existing harness. Extend `qa/functional` when that harness is already there. If the only Playwright config is outside `qa/functional`, extend that one and do not create a second suite.
 - Reuse compatible installed dependencies, browser binaries, and an existing harness. For a remote URL without a repository, reuse a compatible standalone harness in the current workspace instead of scaffolding another one.
 - Use the project's lockfile and package manager. Add only missing Playwright dependencies and required browser binaries; do not upgrade unrelated packages.
 - Do not invent credentials, secrets, seed data, routes, or expected outcomes. Ask for missing information only when it prevents a meaningful assertion or safe execution.
@@ -105,7 +121,7 @@ Skip this section in initialize mode. When the user asks to test a page or a fun
 - **This page has no specs yet.** Generate the checklist, page object, and specs, then run them:
 
 1. Open that page with playwright-cli and take a snapshot. Follow [playwright-cli.md](references/playwright-cli.md) before the first browser command.
-2. Draft the checklist with the bundled snapshot script in [Bundled helpers](#bundled-helpers). Write it to `tests/e2e/<function>/checklist.json`, and write that function's spec in the same folder. `<function>` is the feature name with spaces and path separators removed. Keep the visible buttons, inputs, links, and states that belong to the named function. Use source only to confirm a control already tied to that function. Each item keeps `accessibleName`, `visibleText`, `page`, and, when the visible text is repeated, a unique `scope`.
+2. Draft the checklist with the bundled snapshot script in [Bundled helpers](#bundled-helpers). Write it to `qa/functional/tests/e2e/<function>/checklist.json`, and write that function's spec in the same folder. `<function>` is the feature name with spaces and path separators removed. Keep the visible buttons, inputs, links, and states that belong to the named function. Use source only to confirm a control already tied to that function. Each item keeps `accessibleName`, `visibleText`, `page`, and, when the visible text is repeated, a unique `scope`.
 3. Give each item a precondition, an action, and the expected visible result. Each action gets a success path. Add a validation or failure path when that result is visible on the page or the user stated it. One representative case covers inputs that share the same result.
 4. Open menus, dialogs, and post-submit states that belong to the named function, then add the controls they reveal. Keep the viewport from [Screenshot size](#screenshot-size). While an overlay is open, read each in-suite control's bounding box. When its bottom is below the viewport, scroll only the overlay container that owns the control. Do not scroll the document behind a fixed overlay, do not call `scrollIntoViewIfNeeded()` on a control inside one, and do not change the chosen resolution. List any state that was not opened as not yet covered.
 5. Keep controls and expected results to what was observed or what the user stated. Ask only when a named function has no observable result to assert. Before drafting the page object, the next action's target must be inside the viewport. A heading that remains in the accessibility tree is not enough to treat an overlay as open.
@@ -116,11 +132,11 @@ Skip this section in initialize mode. When the user asks to test a page or a fun
 Read [implementation-guide.md](references/implementation-guide.md) before creating a new Playwright harness or substantially changing an existing one.
 
 - Default to TypeScript when the project supports it; otherwise match the project's JavaScript module style.
-- Prefer an existing test directory. For a new suite, use `tests/e2e/` unless repository conventions suggest another location.
-- Create or update `playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
+- For a new suite, use `qa/functional/tests/e2e/`. Extend that directory when it already exists.
+- Create or update `qa/functional/playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
 - Add non-conflicting package scripts for running the suite and opening its report when useful.
-- Ignore generated report and artifact directories in version control, including `reports/allure-results/`, `reports/allure-report/`, and `reports/prompts/`. Never ignore the specs or configuration.
-- Put secrets in environment variables and keep authentication state or credential files out of version control. Ignore the saved-login file, such as `.auth/`.
+- Ignore generated report and artifact directories in version control, including `qa/functional/reports/allure-results/`, `qa/functional/reports/allure-report/`, and `qa/functional/reports/prompts/`. Never ignore the specs or configuration.
+- Put secrets in environment variables and keep authentication state or credential files out of version control. Ignore the saved-login file, such as `qa/functional/.auth/`.
 - In smoke mode, install only a missing Chromium binary. Do not install additional browsers unless the selected profile needs them.
 - In initialize-only mode, do not download browser binaries unless they are required for a user-requested smoke execution. Dependency installation and browser installation are separate steps; report either one as blocked rather than pretending the scaffold is verified.
 
@@ -129,8 +145,8 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 Skip this section in initialize mode. An empty configured test directory is preferable to invented examples or placeholder tests.
 
 - Derive new tests from requirements, the running application, and relevant source routes or components. Discover flows and locators with playwright-cli, including its test-generation flow when a live page is needed. Review and rewrite generated output before treating it as a maintained test. Leave specs the user supplied unchanged except for a locator repair inside the page object.
-- Save each function's checklist and spec together in `tests/e2e/<function>/`. Use `checklist.json` and `<function>.spec.ts` there. A pytest project uses `test_<function>.py` in that same folder instead of a `.spec.ts` file. Do not place a second function's checklist or spec in that folder.
-- Draft a page object when this page has none, or extend the existing one for new controls or a stale locator. Use the bundled page-object script for a new draft, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `tests/pages/<page-name>.page.ts`. Merge the draft into an existing page object.
+- Save each function's checklist and spec together in `qa/functional/tests/e2e/<function>/`. Use `checklist.json` and `<function>.spec.ts` there. A pytest project uses `test_<function>.py` in that same folder instead of a `.spec.ts` file. Do not place a second function's checklist or spec in that folder.
+- Draft a page object when this page has none, or extend the existing one for new controls or a stale locator. Use the bundled page-object script for a new draft, then review it against [implementation-guide.md](references/implementation-guide.md). Reuse the repository's existing page-object directory; otherwise use `qa/functional/tests/pages/<page-name>.page.ts`. Merge the draft into an existing page object.
 - Put navigation, locators, and user actions on the page object. Keep assertions in the spec. Do not copy those selectors back into the spec, and do not invent controls that were not observed on the page or in source.
 - Assert user-visible outcomes, not implementation details. A completed click or navigation is not sufficient without an observable expectation.
 - Record each new case so the Allure report can show it: a title for the visible outcome, epic, feature, story, and severity. Wrap each user-visible operation in its own named step, including opening the page, each click or fill, and the assertion. By default, after each operation completes, attach one viewport screenshot to that step, named with the step name. The image uses the size in [Screenshot size](#screenshot-size), so the default report image is 1920×1080. When the user asks for one screenshot per completed flow, attach a single viewport screenshot only after that flow's final assertion, named with the flow title, and do not attach a screenshot to the earlier steps. Attach an API body or resulting URL when that evidence exists, after redacting passwords and tokens. Read [implementation-guide.md](references/implementation-guide.md) for the report contract.
@@ -161,14 +177,14 @@ An unexecuted or blocked test is never a pass. If a retry passes after an earlie
 
 After every executed run, publish an Allure report and keep authentication secrets out of it. The directory layout and required fields are in this section. Open [implementation-guide.md](references/implementation-guide.md) only when the diagnosis flow needs a contract that is not stated here. Give this run one directory name, `<function>-<YYYYMMDD-HHMMSS>`, and use it for both the raw results and the HTML report so a later run does not overwrite either.
 
-`<function>` is the feature just tested, such as `登录`, with spaces and path separators removed. When this run covers more than one feature, join those names with `-`. The directory name must contain that feature text and must not be only digits. Write this run's result JSON, screenshots, text attachments, and `environment.properties` under `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. Generate the HTML report with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write into `reports/allure-results/` or `reports/allure-report/` themselves. After generation succeeds, open that run's report directory with a local server in the background: `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Use `npx allure` when the global `allure` command is missing, and add `allure-commandline` only when neither is available. Record the `http://127.0.0.1` URL the server prints. A Playwright Test project writes results with `allure-playwright` into that results directory. A pytest project passes `--alluredir=reports/allure-results/<function>-<YYYYMMDD-HHMMSS>`.
+`<function>` is the feature just tested, such as `登录`, with spaces and path separators removed. When this run covers more than one feature, join those names with `-`. The directory name must contain that feature text and must not be only digits. Write this run's result JSON, screenshots, text attachments, and `environment.properties` under `qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. Generate the HTML report with `allure generate qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write into `qa/functional/reports/allure-results/` or `qa/functional/reports/allure-report/` themselves. After generation succeeds, open that run's report directory with a local server in the background: `allure open qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Use `npx allure` when the global `allure` command is missing, and add `allure-commandline` only when neither is available. Record the `http://127.0.0.1` URL the server prints. A Playwright Test project writes results with `allure-playwright` into that results directory. A pytest project passes `--alluredir=qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>`.
 
 After the run, provide:
 
 - the functional checklist and any state left not yet covered, when this request tested a page or a function;
 - the exact environment and command used;
 - created or changed test files;
-- passed, failed, broken, skipped, blocked, and not-run counts, using the bundled report script on this run's `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`;
+- passed, failed, broken, skipped, blocked, and not-run counts, using the bundled report script on this run's `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`;
 - application defects with reproduction steps and evidence;
 - test-infrastructure failures separately from product failures;
 - the local server URL from `allure open`, plus relevant screenshots and text attachments inside that report;
@@ -178,7 +194,7 @@ After the run, provide:
 
 Say “the executed scenarios passed,” never “the application is bug-free.”
 
-Before that summary, save the user prompt that invoked this skill. Use the same `<function>-<YYYYMMDD-HHMMSS>` name already chosen for this run's Allure directories, including when report generation was blocked after that name was chosen. Write it to `reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md`. The file body is that prompt verbatim: the user message that started this invocation, not a paraphrase, and not later turns. An initialize-only finish, or a finish blocked before a feature name exists, uses `初始化` as `<function>` and the local time at the end of the run. Ignore `reports/prompts/` in version control.
+Before that summary, save the user prompt that invoked this skill. Use the same `<function>-<YYYYMMDD-HHMMSS>` name already chosen for this run's Allure directories, including when report generation was blocked after that name was chosen. Write it to `qa/functional/reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md`. The file body is that prompt verbatim: the user message that started this invocation, not a paraphrase, and not later turns. An initialize-only finish, or a finish blocked before a feature name exists, uses `初始化` as `<function>` and the local time at the end of the run. Ignore `qa/functional/reports/prompts/` in version control.
 
 For initialize-only work, report instead:
 
@@ -199,10 +215,10 @@ python3 scripts/checklist_from_snapshot.py \
   --function "<function>" \
   --page "<url-or-route>" \
   --snapshot <snapshot.yml> \
-  --json tests/e2e/<function>/checklist.json
+  --json qa/functional/tests/e2e/<function>/checklist.json
 
 python3 scripts/page_object_from_checklist.py \
-  --json tests/e2e/<function>/checklist.json \
+  --json qa/functional/tests/e2e/<function>/checklist.json \
   --class-name <PageClass> \
   --route <route>
 
@@ -210,4 +226,4 @@ python3 scripts/summarize_playwright_report.py \
   --json <playwright-results.json>
 ```
 
-Run the checklist and page-object scripts only when creating the first checklist, or when the user explicitly asked to recompare the checklist and new controls are being appended. On a later run the default is that the page is unchanged, so skip both scripts and skip the live checklist comparison. A missing page object, a stale locator found by a failed run, or an explicit request to regenerate the checklist are the other reasons to edit those artifacts. After a new checklist script run, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items for the requested page, uses the visible text when it differs from the accessible name, scopes repeated labels, and refuses to overwrite an existing file or to emit an ambiguous locator. Run it once per page. Review its locators and method names before saving. The report script reads either Playwright JSON or this run's `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`. Use the Allure summary after generation. Classify blocked and not-run cases outside that file.
+Run the checklist and page-object scripts only when creating the first checklist, or when the user explicitly asked to recompare the checklist and new controls are being appended. On a later run the default is that the page is unchanged, so skip both scripts and skip the live checklist comparison. A missing page object, a stale locator found by a failed run, or an explicit request to regenerate the checklist are the other reasons to edit those artifacts. After a new checklist script run, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items for the requested page, uses the visible text when it differs from the accessible name, scopes repeated labels, and refuses to overwrite an existing file or to emit an ambiguous locator. Run it once per page. Review its locators and method names before saving. The report script reads either Playwright JSON or this run's `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`. Use the Allure summary after generation. Classify blocked and not-run cases outside that file.

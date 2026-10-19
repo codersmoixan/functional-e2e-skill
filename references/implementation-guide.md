@@ -13,7 +13,7 @@ Initialization is complete when all applicable items below are true:
 3. The configured test directory exists. During initialization, do not add an empty `pages/` or `fixtures/` directory. When a later authoring step tests a page, create that page's page object in the same change.
 4. Package scripts expose stable entry points for test discovery or execution and HTML report viewing without replacing unrelated scripts. Prefer names consistent with the repository; otherwise use clear names such as `test:e2e`, `test:e2e:headed`, and `test:e2e:report`.
 5. Generated outputs such as `playwright-report/`, `test-results/`, traces, screenshots, and videos are ignored without ignoring specs or configuration.
-6. URLs, credentials, and environment-specific values are not hard-coded. Add or extend `.env.example` only when the project already uses environment files or the requested harness needs a documented variable such as `PLAYWRIGHT_BASE_URL`. Never create a populated secret file.
+6. URLs, credentials, and environment-specific values are not hard-coded. Add or extend `.env.example` at the repository root only when the project already uses environment files or the requested harness needs a documented variable such as `PLAYWRIGHT_BASE_URL`. Never create a populated secret file, and do not put `.env` under `qa/functional`.
 7. Configuration loading and test discovery have been checked with the project-native command. An empty suite may be acceptable for initialization, but distinguish "configuration and discovery validated" from "browser scenarios executed."
 
 Do not copy application-specific sample pages or tests merely to make the tree look complete. If a runnable proof is requested and the application has a known safe readiness page, add one small observable smoke test; otherwise leave business tests for the authoring stage. Avoid placeholder tests that always pass.
@@ -74,46 +74,48 @@ Do not send several invented accounts merely to repeat the same server-side reje
 
 Log in once for an account, then reuse that session for later authenticated features. A second feature, such as editing a profile after an earlier feature already signed in, opens its page with the saved session and does not repeat the login form.
 
-- After the first successful login, save Playwright storage state to `.auth/<role>.json`. That file holds the cookies and local storage, including the session token. Use one file per account role. With playwright-cli, save and load it through `state-save` and `state-load`, as described in [playwright-cli/storage-state.md](playwright-cli/storage-state.md).
-- If the application keeps the token only in the login response, store that token in the same ignored `.auth/` file and apply it the way the application reads it before opening the next page.
+- After the first successful login, save Playwright storage state to `qa/functional/.auth/<role>.json`. That file holds the cookies and local storage, including the session token. Use one file per account role. With playwright-cli, save and load it through `state-save` and `state-load`, as described in [playwright-cli/storage-state.md](playwright-cli/storage-state.md).
+- If the application keeps the token only in the login response, store that token in the same ignored `qa/functional/.auth/` file and apply it the way the application reads it before opening the next page.
 - Before an authenticated feature, load the saved session. When the feature's page opens as an authenticated page, continue. When the saved file is missing, or the application returns to the login page or rejects the token, sign in once, replace the saved file, and continue.
 - A test whose subject is login still performs the login steps. When its valid-login case succeeds, refresh the saved file from that session.
-- Keep `.auth/` out of version control, Allure attachments, screenshots, and failure output. Business records created by one feature stay out of the next feature's preconditions.
+- Keep `qa/functional/.auth/` out of version control, Allure attachments, screenshots, and failure output. Business records created by one feature stay out of the next feature's preconditions.
 
 ## Recommended new-suite shape
 
-Use repository conventions when present. Otherwise prefer:
+Use this layout for a new harness. Paths inside `playwright.config.*` are relative to `qa/functional/`. Commands and Allure paths below are from the repository root.
 
 ```text
-playwright.config.ts
-tests/
-  e2e/
-    <function>/
-      checklist.json
-      <function>.spec.ts
-  pages/
-    <page-name>.page.ts   # one page object per page a spec opens
-  fixtures/               # only when a fixture is used by a test
-playwright-report/        # generated, ignored
-test-results/             # generated, ignored
+qa/functional/
+  playwright.config.ts
+  tests/
+    e2e/
+      <function>/
+        checklist.json
+        <function>.spec.ts
+    pages/
+      <page-name>.page.ts   # one page object per page a spec opens
+    fixtures/               # only when a fixture is used by a test
+  .auth/                    # saved login, ignored
+  reports/                  # Allure results, HTML report, prompts; ignored
+  playwright-report/        # generated, ignored
+  test-results/             # generated, ignored
 ```
 
-`<function>` is the feature being tested, with spaces and path separators removed, such as `新增地址`. Each feature gets its own folder. The checklist and the spec for that feature stay in that folder. A pytest project stores `test_<function>.py` there instead of `<function>.spec.ts`. Page objects stay shared under `tests/pages/` because more than one feature can open the same page. From `tests/e2e/<function>/`, import a page object with `../../pages/<page-name>.page`.
+`<function>` is the feature being tested, with spaces and path separators removed, such as `新增地址`. Each feature gets its own folder. The checklist and the spec for that feature stay in that folder. A pytest project stores `test_<function>.py` there instead of `<function>.spec.ts`. Page objects stay shared under `qa/functional/tests/pages/` because more than one feature can open the same page. From `qa/functional/tests/e2e/<function>/`, import a page object with `../../pages/<page-name>.page`.
 
 Create `pages/` together with the first page object. Do not add an empty `pages/` or `fixtures/` directory during initialization.
 
 A minimal initialization may therefore contain only:
 
 ```text
-playwright.config.ts
-tests/
-  e2e/
-package.json                 # existing file with non-conflicting scripts
+qa/functional/playwright.config.ts
+qa/functional/tests/e2e/
+package.json                 # existing file, with a script that passes --config qa/functional/playwright.config.ts
 .gitignore                   # existing or created only when appropriate
-.env.example                 # only when configuration needs documented variables
+.env.example                 # repository root, only when configuration needs documented variables
 ```
 
-Do not add a custom runner program when package scripts and the Playwright CLI already provide the required entry points. The human report for an executed run is Allure, generated into `reports/allure-report/`. Add JUnit only for CI integration or when the user asks for it.
+Do not add a custom runner program when package scripts and the Playwright CLI already provide the required entry points. The human report for an executed run is Allure, generated into `qa/functional/reports/allure-report/`. Add JUnit only for CI integration or when the user asks for it.
 
 ## Configuration decisions
 
@@ -127,7 +129,7 @@ Set configuration from observed project facts:
 - `retries`: normally zero locally and a small number in CI. Retries must not conceal a known deterministic failure.
 - `workers`: respect the application's test-data isolation. Reduce parallelism when tests share unsafe state.
 - `outputDir`: keep screenshots, videos, and traces in a generated artifact directory.
-- `reporter`: concise terminal output plus Allure results in this run's `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. For Playwright Test, point `allure-playwright` `resultsDir` at that directory. For pytest, pass `--alluredir=reports/allure-results/<function>-<YYYYMMDD-HHMMSS>` and do not pass `--clean-alluredir`. Add JUnit for CI integration or when explicitly requested.
+- `reporter`: concise terminal output plus Allure results in this run's `qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. For Playwright Test, point `allure-playwright` `resultsDir` at `reports/allure-results/<function>-<YYYYMMDD-HHMMSS>` (relative to `qa/functional/`). For pytest, pass `--alluredir=qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>` and do not pass `--clean-alluredir`. Add JUnit for CI integration or when explicitly requested.
 - `use.trace`: prefer `on-first-retry` when CI retries are enabled or `retain-on-failure` when they are not.
 - `use.screenshot`: prefer `only-on-failure`.
 - `use.video`: prefer `retain-on-failure` when video materially helps and runtime cost is acceptable.
@@ -135,6 +137,9 @@ Set configuration from observed project facts:
 A representative configuration shape is:
 
 ```ts
+// qa/functional/playwright.config.ts
+// Paths in this file are relative to qa/functional/. Secrets come from the repository-root .env.
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -157,11 +162,14 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
+    cwd: path.join(__dirname, '..'),
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
   },
 });
 ```
+
+`webServer.cwd` is the repository root (`..` from `qa/functional`). Point it at the app directory when the start script is not at that root. Load `.env` from the repository root, not from `qa/functional`.
 
 Change the URL, command, package manager, projects, and artifact choices to match the project. Do not add a `webServer` for a remote target.
 
@@ -200,7 +208,7 @@ The JSON for each item also stores `accessibleName`, `visibleText`, `page`, `sco
 
 When the first specs for a page are written, create that page's page object in the same change. When specs already exist, reuse the page object. Create a missing one from the controls those specs use, and change an existing one only to add a new control or repair a stale locator.
 
-- One class per page. Name the file from the page, such as `tests/pages/profile.page.ts` for `/profile`. Match an existing page-object directory and naming style when the repository already has one.
+- One class per page. Name the file from the page, such as `qa/functional/tests/pages/profile.page.ts` for `/profile`. Match an existing page-object directory and naming style when the repository already has one.
 - If a page object for that page already exists, extend it with the locators and actions this test needs. Do not create a second class for the same page.
 - The page object owns `goto`, locators, and user actions such as filling a form or submitting. The spec owns test data and assertions.
 - Locators must come from the live page, via playwright-cli, or from the page's source. Do not add controls that were not observed.
@@ -283,14 +291,14 @@ Separate these categories:
 - Infrastructure failure: the server, browser, dependency, network, or environment could not support execution.
 - Flaky result: repeated executions under the same known conditions disagree.
 
-The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status. In the user-facing summary, also state the wall-clock time from the start of the skill invocation through report generation, opening, and writing this invocation's prompt file. That total is separate from the test duration inside the Allure report.
+The Allure report served by `allure open` on this run's directory is the primary human artifact. Read counts from `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json` with `scripts/summarize_playwright_report.py`, and verify that summary against the runner exit status. In the user-facing summary, also state the wall-clock time from the start of the skill invocation through report generation, opening, and writing this invocation's prompt file. That total is separate from the test duration inside the Allure report.
 
 ## Allure report contract
 
 Produce this layout after every executed run. Choose one `<function>-<YYYYMMDD-HHMMSS>` name and use it for both report directories and the prompt file. Earlier runs stay in their own directories.
 
 ```text
-reports/
+qa/functional/reports/
   allure-results/
     <function>-<YYYYMMDD-HHMMSS>/
       environment.properties
@@ -305,11 +313,11 @@ reports/
     <function>-<YYYYMMDD-HHMMSS>.md
 ```
 
-`<function>` is the feature just tested, such as `登录`. Remove spaces and path separators. When this run covers more than one feature, join those names with `-`. The directory name contains that feature text and is not only digits. An example pair is `reports/allure-results/登录-20261014-175800/` and `reports/allure-report/登录-20261014-175800/`. The prompt file for that same run is `reports/prompts/登录-20261014-175800.md`.
+`<function>` is the feature just tested, such as `登录`. Remove spaces and path separators. When this run covers more than one feature, join those names with `-`. The directory name contains that feature text and is not only digits. An example pair is `qa/functional/reports/allure-results/登录-20261014-175800/` and `qa/functional/reports/allure-report/登录-20261014-175800/`. The prompt file for that same run is `qa/functional/reports/prompts/登录-20261014-175800.md`.
 
-When the flow ends, write `reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md` with the same name as this run's report directories. The body is the user message that invoked this skill, copied verbatim. Do not paraphrase it and do not append later conversation. If the run ends before a feature name exists, use `初始化` and the local time at the end. Keep `reports/prompts/` out of version control.
+When the flow ends, write `qa/functional/reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md` with the same name as this run's report directories. The body is the user message that invoked this skill, copied verbatim. Do not paraphrase it and do not append later conversation. If the run ends before a feature name exists, use `初始化` and the local time at the end. Keep `qa/functional/reports/prompts/` out of version control.
 
-Write `environment.properties` into the results directory before generation. Generate with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `reports/allure-results/` or `reports/allure-report/` themselves. Then start `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
+Write `environment.properties` into the results directory before generation. Generate with `allure generate qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `qa/functional/reports/allure-results/` or `qa/functional/reports/allure-report/` themselves. Then start `allure open qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
 
 ```text
 Environment=<env>

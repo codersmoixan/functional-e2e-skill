@@ -27,7 +27,7 @@ Use playwright-test-automation to test the add-address feature at http://127.0.0
 ```
 
 ```text
-Use playwright-test-automation to run tests/e2e/新增地址/新增地址.spec.ts.
+Use playwright-test-automation to run qa/functional/tests/e2e/新增地址/新增地址.spec.ts.
 ```
 
 ```text
@@ -41,7 +41,7 @@ Provide the page URL or start command, and the visible result you expect. Put ac
 ## What happens on a test request
 
 1. **You supplied specs.** Those specs run. Their scenarios stay as written. A page object is added only when one is missing, and a locator is updated only when a failure shows it is stale.
-2. **This feature already has a checklist, spec, and page object in `tests/e2e/<function>/`.** Those specs run immediately. Guide reading, the checklist JSON, and a live control comparison are skipped until that attempt fails. A product failure stops at the evidence. A stale locator or a missing control opens one diagnosis pass, repairs the page object, and reruns only the affected spec. A live checklist comparison happens before the run only when you explicitly ask to recheck the checklist, or explicitly say controls were added, removed, or changed. The checklist is rebuilt only when you ask to regenerate it. Use the same feature name so the same folder is found.
+2. **This feature already has a checklist, spec, and page object in `qa/functional/tests/e2e/<function>/`.** Those specs run immediately. Guide reading, the checklist JSON, and a live control comparison are skipped until that attempt fails. A product failure stops at the evidence. A stale locator or a missing control opens one diagnosis pass, repairs the page object, and reruns only the affected spec. A live checklist comparison happens before the run only when you explicitly ask to recheck the checklist, or explicitly say controls were added, removed, or changed. The checklist is rebuilt only when you ask to regenerate it. Use the same feature name so the same folder is found.
 3. **This feature has no specs yet.** The page is opened, a checklist is written, then a page object and spec are written and executed.
 
 Initialization alone stops after the harness is configured and test discovery succeeds. It does not open the page or invent business specs.
@@ -49,25 +49,27 @@ Initialization alone stops after the harness is configured and test discovery su
 ## Files it writes
 
 ```text
-tests/
-  e2e/<function>/
-    checklist.json
-    <function>.spec.ts      # pytest projects use test_<function>.py
-  pages/<page-name>.page.ts
-.auth/<role>.json           # saved login, not committed
-reports/
-  allure-results/<function>-<YYYYMMDD-HHMMSS>/
-  allure-report/<function>-<YYYYMMDD-HHMMSS>/
-  prompts/<function>-<YYYYMMDD-HHMMSS>.md
+qa/functional/
+  playwright.config.ts
+  tests/
+    e2e/<function>/
+      checklist.json
+      <function>.spec.ts      # pytest projects use test_<function>.py
+    pages/<page-name>.page.ts
+  .auth/<role>.json           # saved login, not committed
+  reports/
+    allure-results/<function>-<YYYYMMDD-HHMMSS>/
+    allure-report/<function>-<YYYYMMDD-HHMMSS>/
+    prompts/<function>-<YYYYMMDD-HHMMSS>.md
 ```
 
-Page objects stay under `tests/pages/` so several features can share a page. Login state stays in `.auth/` and is reused by the next authenticated feature. If that state is missing or the site returns to the login page, the skill signs in once and refreshes the file. A test whose subject is login still performs the login steps.
+Page objects stay under `qa/functional/tests/pages/` so several features can share a page. Login state stays in `qa/functional/.auth/` and is reused by the next authenticated feature. If that state is missing or the site returns to the login page, the skill signs in once and refreshes the file. A test whose subject is login still performs the login steps. `.env` stays at the repository root.
 
 ## Reports and screenshots
 
-Each run gets a new results directory and a matching report directory, named with the feature and the local time, for example `reports/allure-report/登录-20261014-175800/`. Earlier runs are left in place. After generation, `allure open` serves that report and the summary includes the printed `http://127.0.0.1` URL.
+Each run gets a new results directory and a matching report directory, named with the feature and the local time, for example `qa/functional/reports/allure-report/登录-20261014-175800/`. Earlier runs are left in place. After generation, `allure open` serves that report and the summary includes the printed `http://127.0.0.1` URL.
 
-When the run ends, the prompt that invoked the skill is saved under the same name, for example `reports/prompts/登录-20261014-175800.md`. That file is the user message verbatim. An initialize-only finish uses `初始化` instead of a feature name. `reports/prompts/` is not committed.
+When the run ends, the prompt that invoked the skill is saved under the same name, for example `qa/functional/reports/prompts/登录-20261014-175800.md`. That file is the user message verbatim. An initialize-only finish uses `初始化` instead of a feature name. `qa/functional/reports/prompts/` is not committed.
 
 Screenshots and the browser viewport default to 1920×1080, including every image in the Allure report. State another size in the request when you want one, for example `1440×900`. Ask for one screenshot per completed flow when you only want an image after the flow's final assertion:
 
