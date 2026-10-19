@@ -9,11 +9,11 @@ Treat initialization as the first independently verifiable stage of automation w
 Initialization is complete when all applicable items below are true:
 
 1. The repository's package manager, TypeScript or JavaScript style, module format, application start command, and existing test conventions have been detected rather than assumed.
-2. A single compatible `@playwright/test` dependency and configuration entry point exist. Preserve compatible versions and configuration; add only what is missing.
+2. A single compatible `@playwright/test` dependency and configuration entry point exist. Install it from `qa/functional/package.json`, not from the application package and not from a repository-root manifest. Preserve compatible versions and configuration; add only what is missing. Do not change the application's lockfile. Do not set `"type": "module"` on that manifest; it breaks a CommonJS `playwright.config.js`.
 3. The configured test directory exists. During initialization, do not add an empty `pages/` or `fixtures/` directory. When a later authoring step tests a page, create that page's page object in the same change.
-4. Package scripts expose stable entry points for test discovery or execution and HTML report viewing without replacing unrelated scripts. Prefer names consistent with the repository; otherwise use clear names such as `test:e2e`, `test:e2e:headed`, and `test:e2e:report`.
-5. Generated outputs such as `playwright-report/`, `test-results/`, traces, screenshots, and videos are ignored without ignoring specs or configuration.
-6. URLs, credentials, and environment-specific values are not hard-coded. Add or extend `.env.example` at the repository root only when the project already uses environment files or the requested harness needs a documented variable such as `PLAYWRIGHT_BASE_URL`. Never create a populated secret file, and do not put `.env` under `qa/functional`.
+4. `qa/functional/package.json` exposes stable entry points for test discovery or execution and HTML report viewing. Do not add those scripts to the application `package.json` or to a repository-root `package.json`. Prefer names consistent with the repository; otherwise use clear names such as `test:e2e`, `test:e2e:headed`, and `test:e2e:report`. Run them with the working directory `qa/functional`.
+5. Generated outputs stay under `qa/functional` and are ignored from `qa/functional/.gitignore` only: `node_modules/`, `.playwright-cli/`, `.env`, `.auth/`, `reports/`, `test-results/`, `playwright-report/`, and `blob-report/`. Do not edit the application's `.gitignore` or a repository-root `.gitignore`. Do not ignore specs, `qa/functional/package.json`, the lockfile, or configuration.
+6. URLs, credentials, and environment-specific values are not hard-coded. Read an existing repository-root `.env` or `.env.local` when it is already there. Do not create or modify those root files. Document a new variable in `qa/functional/.env.example` with placeholders only. A secret this skill creates goes in gitignored `qa/functional/.env`.
 7. Configuration loading and test discovery have been checked with the project-native command. An empty suite may be acceptable for initialization, but distinguish "configuration and discovery validated" from "browser scenarios executed."
 
 Do not copy application-specific sample pages or tests merely to make the tree look complete. If a runnable proof is requested and the application has a known safe readiness page, add one small observable smoke test; otherwise leave business tests for the authoring stage. Avoid placeholder tests that always pass.
@@ -46,7 +46,7 @@ Before editing, determine:
 6. Required account roles, seed data, APIs, environment variables, and feature flags.
 7. CI platform and any existing artifact conventions.
 
-Reuse the project's dependency cache, Playwright browser cache, and compatible existing harness. Do not run an interactive initializer over an established harness. For a remote target without a repository, first look for a compatible standalone harness in the current workspace. For a genuinely new harness, either use the official initializer when interaction is appropriate or add the minimum files deliberately with the project's package manager.
+Reuse the `qa/functional` test install, Playwright browser cache, and compatible existing harness. Do not install functional-test packages into the application or into a repository-root `package.json`, and do not run an interactive initializer over an established harness. Run `playwright test`, `allure`, and `playwright-cli` with the working directory `qa/functional` so the CLI session directory is `qa/functional/.playwright-cli/`. For a remote target without a repository, first look for a compatible standalone harness in the current workspace. For a genuinely new harness, either use the official initializer when interaction is appropriate or add the minimum files deliberately with the project's package manager.
 
 ## Execution profiles
 
@@ -82,10 +82,11 @@ Log in once for an account, then reuse that session for later authenticated feat
 
 ## Recommended new-suite shape
 
-Use this layout for a new harness. Paths inside `playwright.config.*` are relative to `qa/functional/`. Commands and Allure paths below are from the repository root.
+Use this layout for a new harness. Paths inside `playwright.config.*` are relative to `qa/functional/`. Run Playwright, Allure, and playwright-cli from `qa/functional`. Allure paths below are relative to that directory.
 
 ```text
 qa/functional/
+  package.json                 # test dependencies and scripts only
   playwright.config.ts
   tests/
     e2e/
@@ -96,6 +97,7 @@ qa/functional/
       <page-name>.page.ts   # one page object per page a spec opens
     fixtures/               # only when a fixture is used by a test
   .auth/                    # saved login, ignored
+  .playwright-cli/          # playwright-cli session scratch, ignored
   reports/                  # Allure results, HTML report, prompts; ignored
   playwright-report/        # generated, ignored
   test-results/             # generated, ignored
@@ -108,11 +110,11 @@ Create `pages/` together with the first page object. Do not add an empty `pages/
 A minimal initialization may therefore contain only:
 
 ```text
+qa/functional/package.json
 qa/functional/playwright.config.ts
 qa/functional/tests/e2e/
-package.json                 # existing file, with a script that passes --config qa/functional/playwright.config.ts
-.gitignore                   # existing or created only when appropriate
-.env.example                 # repository root, only when configuration needs documented variables
+qa/functional/.gitignore     # node_modules, .playwright-cli, .env, reports, .auth, test-results, playwright-report, blob-report
+qa/functional/.env.example   # placeholders only, when a variable must be documented
 ```
 
 Do not add a custom runner program when package scripts and the Playwright CLI already provide the required entry points. The human report for an executed run is Allure, generated into `qa/functional/reports/allure-report/`. Add JUnit only for CI integration or when the user asks for it.
@@ -169,7 +171,7 @@ export default defineConfig({
 });
 ```
 
-`webServer.cwd` is the repository root (`..` from `qa/functional`). Point it at the app directory when the start script is not at that root. Load `.env` from the repository root, not from `qa/functional`.
+`webServer.cwd` points at the directory that contains the application start script. That may be outside `qa/functional`; it is the process cwd for starting the app, not a place to write test files. `outputDir`, the HTML report, and the blob report stay inside `qa/functional` (`test-results/`, `playwright-report/`, `blob-report/`). Load secrets from an existing repository-root `.env` when present, otherwise from `qa/functional/.env`. Do not create or modify the repository-root `.env`.
 
 Change the URL, command, package manager, projects, and artifact choices to match the project. Do not add a `webServer` for a remote target.
 
@@ -262,7 +264,7 @@ Generated tests must include assertions for the intended business result. Review
 
 ## Execution loop
 
-Use commands matching the project's package manager. A useful sequence is:
+Use commands from `qa/functional`, where the functional-test dependencies are installed. A useful sequence is:
 
 1. When this page has no specs yet, the playwright-cli discovery pass produces the functional checklist before any spec is written. Read [playwright-cli.md](playwright-cli.md) first, drive the page with snapshot refs, and pass the snapshot through `scripts/checklist_from_snapshot.py`. Open each overlay the function uses, measure its action controls against the viewport, and confirm a viewport screenshot leaves the overlay open. When the checklist, spec, and page object already exist, run those specs immediately and skip guide reading, checklist comparison, and playwright-cli. Open that diagnosis flow only after the first attempt fails, and only for a failure that is not an application defect.
 2. List or compile-discover tests only when authoring new specs or diagnosing a compile or configuration failure. An existing-spec rerun goes straight to the suite.
@@ -317,7 +319,7 @@ qa/functional/reports/
 
 When the flow ends, write `qa/functional/reports/prompts/<function>-<YYYYMMDD-HHMMSS>.md` with the same name as this run's report directories. The body is the user message that invoked this skill, copied verbatim. Do not paraphrase it and do not append later conversation. If the run ends before a feature name exists, use `初始化` and the local time at the end. Keep `qa/functional/reports/prompts/` out of version control.
 
-Write `environment.properties` into the results directory before generation. Generate with `allure generate qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `qa/functional/reports/allure-results/` or `qa/functional/reports/allure-report/` themselves. Then start `allure open qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `npx allure open` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
+Write `environment.properties` into the results directory before generation. From `qa/functional`, generate with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write this run into an earlier directory or into `reports/allure-results/` or `reports/allure-report/` themselves. Then start `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>` in the background so that report is served locally and the browser opens that server. Use `pnpm exec allure open` from `qa/functional` when the global command is missing. Leave the server running and include its `http://127.0.0.1` URL in the summary. `environment.properties` uses the real run values:
 
 ```text
 Environment=<env>

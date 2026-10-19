@@ -50,7 +50,9 @@ Initialization alone stops after the harness is configured and test discovery su
 
 ```text
 qa/functional/
+  package.json                 # functional-test dependencies only
   playwright.config.ts
+  .playwright-cli/             # playwright-cli scratch, not committed
   tests/
     e2e/<function>/
       checklist.json
@@ -63,7 +65,7 @@ qa/functional/
     prompts/<function>-<YYYYMMDD-HHMMSS>.md
 ```
 
-Page objects stay under `qa/functional/tests/pages/` so several features can share a page. Login state stays in `qa/functional/.auth/` and is reused by the next authenticated feature. If that state is missing or the site returns to the login page, the skill signs in once and refreshes the file. A test whose subject is login still performs the login steps. `.env` stays at the repository root.
+Page objects stay under `qa/functional/tests/pages/` so several features can share a page. Login state stays in `qa/functional/.auth/` and is reused by the next authenticated feature. If that state is missing or the site returns to the login page, the skill signs in once and refreshes the file. A test whose subject is login still performs the login steps. Test dependencies stay in `qa/functional/package.json` and are not added to the application package. Playwright, Allure, and playwright-cli run from `qa/functional`, so CLI scratch files stay in `qa/functional/.playwright-cli/`. Every file this skill creates stays under `qa/functional`, including its `.gitignore`, lockfile, `.env.example`, and test-result directories. An existing repository-root `.env` may be read; it is not created or edited.
 
 ## Reports and screenshots
 

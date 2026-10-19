@@ -11,17 +11,23 @@ Build a repository-native Playwright Test setup and prove that the scaffold is u
 
 The repository under test is the working directory. On every pass, create `qa/functional` at that repository root when it is missing.
 
-Every functional-test project file this skill generates goes under `qa/functional`, not the repository root `tests/` or `reports/`:
+Every file this skill creates or edits goes under `qa/functional`. Do not create or edit a repository-root `package.json`, `.gitignore`, `.env`, `.env.example`, `tests/`, `reports/`, or `.playwright-cli/`. Do not edit the application's `package.json`, lockfile, `.gitignore`, Playwright config, or example specs.
 
-- `qa/functional/playwright.config.*` — create it when the repository has no Playwright config yet. An existing Playwright config outside `qa/functional` is still used; do not start a second harness.
+- `qa/functional/playwright.config.*` — always the functional harness. Create it here even when the application already has its own Playwright config. Leave that application config and its example tests untouched.
 - `qa/functional/tests/e2e/<function>/` — checklist and spec.
 - `qa/functional/tests/pages/<page-name>.page.ts` — shared page objects.
+- `qa/functional/package.json` — the only manifest for `@playwright/test`, `allure-playwright`, `allure-commandline`, and the functional-test scripts. Do not create a second test manifest at the repository root.
 - `qa/functional/.auth/` — saved login. Keep it out of version control.
+- `qa/functional/.playwright-cli/` — playwright-cli snapshots, console logs, and session scratch. Keep it out of version control.
 - `qa/functional/reports/` — Allure results, the HTML report, and this invocation's prompt.
 
-Commands run from the repository root. Pass `--config qa/functional/playwright.config.ts` (or `.js`). Paths inside that config file stay relative to `qa/functional/`. Set `webServer.cwd` to the directory that contains the app start script.
+Run `playwright test`, `allure`, and `playwright-cli` with the working directory `qa/functional`, so Node resolves `qa/functional/node_modules` and playwright-cli writes `.playwright-cli` there instead of at the repository root. Pass `--config playwright.config.ts` (or `.js`); that path is relative to `qa/functional/`. Paths inside the config file stay relative to `qa/functional/`. Set `webServer.cwd` to the directory that contains the app start script. Bundled Python helpers still accept repository-root paths such as `qa/functional/tests/...` and can be run from the repository root.
 
-`.env` stays at the repository root. Read credentials and other secrets from that `.env` / `.env.local` or the shell. Do not look for or create `.env` under `qa/functional`.
+Do not add `"type": "module"` to `qa/functional/package.json`. A CommonJS `playwright.config.js` that uses `require` and `module.exports` fails to load when that field is set. Keep the config as `.js` CommonJS, or use `.mjs` / `.ts` when the file itself is ESM.
+
+Do not add functional-test dependencies, scripts, or lockfile changes to the application `package.json`. Installing them there rewrites the application's dependency tree and can break a running app. An application that already lists `@playwright/test` for its own example suite stays untouched; the functional suite uses `qa/functional/package.json`.
+
+Read an existing repository-root `.env` or `.env.local` when it is already there, and read secrets from the shell. Do not create or modify those root files. When this skill needs a documented variable, write `qa/functional/.env.example` with placeholders only. When it needs to store a secret it creates, write gitignored `qa/functional/.env`. The package-manager lockfile belongs next to `qa/functional/package.json`. Playwright's `outputDir`, HTML report, blob report, and traces stay `qa/functional/test-results/`, `qa/functional/playwright-report/`, and `qa/functional/blob-report/`. Ignore entries for those generated directories go only in `qa/functional/.gitignore`.
 
 ## Required artifacts
 
@@ -73,7 +79,7 @@ A missing page object, a request to regenerate the checklist, or an explicit sta
 
 Whenever this skill opens, attaches to, or drives a browser outside the Playwright test runner, read [playwright-cli.md](references/playwright-cli.md) before the first browser command and follow it. That guide is the bundled [playwright-cli skill](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli).
 
-Use `playwright-cli`, or `npx playwright cli` when the global command is missing, exactly as that guide specifies. This covers page discovery, locator exploration, headed inspection, screenshots, live traces, storage and request inspection, and UI review. Do not use the Cursor browser, MCP browser tools, or a one-off Playwright script for those interactions.
+Use `playwright-cli`, or `pnpm exec playwright cli` from `qa/functional` when the global command is missing, exactly as that guide specifies. The working directory is `qa/functional` for every playwright-cli command, including `open`, `resize`, `snapshot`, and `close`. That is what places session files in `qa/functional/.playwright-cli/`. This covers page discovery, locator exploration, headed inspection, screenshots, live traces, storage and request inspection, and UI review. Do not use the Cursor browser, MCP browser tools, or a one-off Playwright script for those interactions.
 
 Committed suite execution still uses the project-native `playwright test` command. Use playwright-cli again only when a result needs a live browser, and keep that pass focused.
 
@@ -106,9 +112,9 @@ For live or shared targets, request economy and safe sequencing take priority ov
 Skip this section when [Existing artifacts run first](#existing-artifacts-run-first) applies and that run has not failed.
 
 - Read repository instructions and inspect the package manager, scripts, framework, existing test directories, Playwright configuration, application start command, target URL, authentication, and data requirements.
-- Preserve the repository's language, package manager, and an existing harness. Extend `qa/functional` when that harness is already there. If the only Playwright config is outside `qa/functional`, extend that one and do not create a second suite.
+- Preserve the repository's language, package manager, and the functional harness under `qa/functional`. Do not extend a Playwright config that lives outside `qa/functional`.
 - Reuse compatible installed dependencies, browser binaries, and an existing harness. For a remote URL without a repository, reuse a compatible standalone harness in the current workspace instead of scaffolding another one.
-- Use the project's lockfile and package manager. Add only missing Playwright dependencies and required browser binaries; do not upgrade unrelated packages.
+- Install functional-test dependencies only into `qa/functional/package.json`, using that directory as the package root. Do not install them into the application package or a repository-root `package.json`, and do not change the application's lockfile. Add only missing test dependencies and required browser binaries; do not upgrade unrelated packages. Run Playwright and Allure from `qa/functional`.
 - Do not invent credentials, secrets, seed data, routes, or expected outcomes. Ask for missing information only when it prevents a meaningful assertion or safe execution.
 - Treat staging and production carefully. Never automate purchases, destructive record changes, outbound messages, or other consequential actions on a shared system without explicit authorization.
 
@@ -134,8 +140,8 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 - Default to TypeScript when the project supports it; otherwise match the project's JavaScript module style.
 - For a new suite, use `qa/functional/tests/e2e/`. Extend that directory when it already exists.
 - Create or update `qa/functional/playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
-- Add non-conflicting package scripts for running the suite and opening its report when useful.
-- Ignore generated report and artifact directories in version control, including `qa/functional/reports/allure-results/`, `qa/functional/reports/allure-report/`, and `qa/functional/reports/prompts/`. Never ignore the specs or configuration.
+- Add test scripts only to `qa/functional/package.json`. Do not add them to the application `package.json` or a repository-root `package.json`.
+- Ignore generated directories only in `qa/functional/.gitignore`: `node_modules/`, `.playwright-cli/`, `.env`, `.auth/`, `reports/allure-results/`, `reports/allure-report/`, `reports/prompts/`, `test-results/`, `playwright-report/`, and `blob-report/`. Never ignore the specs, `qa/functional/package.json`, the lockfile, or configuration. Do not edit any other `.gitignore`.
 - Put secrets in environment variables and keep authentication state or credential files out of version control. Ignore the saved-login file, such as `qa/functional/.auth/`.
 - In smoke mode, install only a missing Chromium binary. Do not install additional browsers unless the selected profile needs them.
 - In initialize-only mode, do not download browser binaries unless they are required for a user-requested smoke execution. Dependency installation and browser installation are separate steps; report either one as blocked rather than pretending the scaffold is verified.
@@ -177,7 +183,7 @@ An unexecuted or blocked test is never a pass. If a retry passes after an earlie
 
 After every executed run, publish an Allure report and keep authentication secrets out of it. The directory layout and required fields are in this section. Open [implementation-guide.md](references/implementation-guide.md) only when the diagnosis flow needs a contract that is not stated here. Give this run one directory name, `<function>-<YYYYMMDD-HHMMSS>`, and use it for both the raw results and the HTML report so a later run does not overwrite either.
 
-`<function>` is the feature just tested, such as `登录`, with spaces and path separators removed. When this run covers more than one feature, join those names with `-`. The directory name must contain that feature text and must not be only digits. Write this run's result JSON, screenshots, text attachments, and `environment.properties` under `qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. Generate the HTML report with `allure generate qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write into `qa/functional/reports/allure-results/` or `qa/functional/reports/allure-report/` themselves. After generation succeeds, open that run's report directory with a local server in the background: `allure open qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Use `npx allure` when the global `allure` command is missing, and add `allure-commandline` only when neither is available. Record the `http://127.0.0.1` URL the server prints. A Playwright Test project writes results with `allure-playwright` into that results directory. A pytest project passes `--alluredir=qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>`.
+`<function>` is the feature just tested, such as `登录`, with spaces and path separators removed. When this run covers more than one feature, join those names with `-`. The directory name must contain that feature text and must not be only digits. Write this run's result JSON, screenshots, text attachments, and `environment.properties` under `qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>/`. From `qa/functional`, generate the HTML report with `allure generate reports/allure-results/<function>-<YYYYMMDD-HHMMSS> -o reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Do not pass `--clean` or `--clean-alluredir`, and do not write into `reports/allure-results/` or `reports/allure-report/` themselves. After generation succeeds, open that run's report directory with a local server in the background: `allure open reports/allure-report/<function>-<YYYYMMDD-HHMMSS>`. Use `pnpm exec allure` from `qa/functional` when the global `allure` command is missing, and add `allure-commandline` only to `qa/functional/package.json` when neither is available. Do not add it to the application package. Record the `http://127.0.0.1` URL the server prints. A Playwright Test project writes results with `allure-playwright` into that results directory. A pytest project passes `--alluredir=qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS>`.
 
 After the run, provide:
 
