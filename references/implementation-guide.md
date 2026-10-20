@@ -74,10 +74,30 @@ Do not send several invented accounts merely to repeat the same server-side reje
 
 Log in once for an account, then reuse that session for later authenticated features. A second feature, such as editing a profile after an earlier feature already signed in, opens its page with the saved session and does not repeat the login form.
 
+**Hard rule when writing `spec.ts` for a page or flow that needs login:** 在编写spec.ts的时候，如果是需要登录的页面需要优先读取.auth/customer.json 文件里读取token. Do this before any email/password UI steps.
+
+Default customer role file: `qa/functional/.auth/customer.json`. Other roles: `qa/functional/.auth/<role>.json`.
+
+Authoring order for authenticated features (checkout, wishlist, profile, place order, and similar — anything that is not a login-subject test):
+
+1. Check whether `qa/functional/.auth/customer.json` (or the matching role file) exists.
+2. If it exists, load it first so the browser already has the session token:
+   ```ts
+   test.use({ storageState: '.auth/customer.json' });
+   ```
+   Paths are relative to `qa/functional/` when Playwright runs from that directory. Do not invent a separate token env var when this file already carries cookies and local storage.
+3. Open the flow. If the app stays authenticated, skip the login form and continue assertions.
+4. If the file is missing, or after load the app still shows login / rejects the session, sign in once through the UI, then overwrite the same file:
+   ```ts
+   await page.context().storageState({ path: '.auth/customer.json' });
+   ```
+5. Never write an authenticated-feature spec that always fills the login form and only writes `customer.json` afterward without reading it first.
+6. A test whose subject is login still performs the login steps. When its valid-login case succeeds, refresh `customer.json` (or the role file) from that session.
+
+Additional contract:
+
 - After the first successful login, save Playwright storage state to `qa/functional/.auth/<role>.json`. That file holds the cookies and local storage, including the session token. Use one file per account role. With playwright-cli, save and load it through `state-save` and `state-load`, as described in [playwright-cli/storage-state.md](playwright-cli/storage-state.md).
 - If the application keeps the token only in the login response, store that token in the same ignored `qa/functional/.auth/` file and apply it the way the application reads it before opening the next page.
-- Before an authenticated feature, load the saved session. When the feature's page opens as an authenticated page, continue. When the saved file is missing, or the application returns to the login page or rejects the token, sign in once, replace the saved file, and continue.
-- A test whose subject is login still performs the login steps. When its valid-login case succeeds, refresh the saved file from that session.
 - Keep `qa/functional/.auth/` out of version control, Allure attachments, screenshots, and failure output. Business records created by one feature stay out of the next feature's preconditions.
 
 ## Recommended new-suite shape

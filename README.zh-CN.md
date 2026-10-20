@@ -65,7 +65,7 @@ qa/functional/
     prompts/<功能>-<YYYYMMDD-HHMMSS>.md
 ```
 
-Page Object 放在 `qa/functional/tests/pages/`，多个功能可以共用同一个页面。登录态放在 `qa/functional/.auth/`，下一个需要登录的功能会继续用它。登录态缺失，或站点又回到登录页时，才重新登录一次并更新这个文件。专门测试登录的用例仍会走登录步骤。测试依赖只放在 `qa/functional/package.json`，不写入业务项目的 `package.json`。Playwright、Allure 和 playwright-cli 都在 `qa/functional` 下执行，因此 CLI 临时文件落在 `qa/functional/.playwright-cli/`。这个技能新建或修改的文件都在 `qa/functional` 下，包括它自己的 `.gitignore`、锁文件、`.env.example` 和测试结果目录。仓库根目录已有的 `.env` 可以读取，不会新建或改写。
+Page Object 放在 `qa/functional/tests/pages/`，多个功能可以共用同一个页面。登录态放在 `qa/functional/.auth/`，下一个需要登录的功能会继续用它。**在编写 spec.ts 的时候，如果是需要登录的页面需要优先读取 `.auth/customer.json` 文件里读取 token**（用 `test.use({ storageState: '.auth/customer.json' })` 加载会话，不要一上来就走邮箱密码登录）。登录态缺失，或站点又回到登录页时，才重新登录一次并更新这个文件。专门测试登录的用例仍会走登录步骤。测试依赖只放在 `qa/functional/package.json`，不写入业务项目的 `package.json`。Playwright、Allure 和 playwright-cli 都在 `qa/functional` 下执行，因此 CLI 临时文件落在 `qa/functional/.playwright-cli/`。这个技能新建或修改的文件都在 `qa/functional` 下，包括它自己的 `.gitignore`、锁文件、`.env.example` 和测试结果目录。仓库根目录已有的 `.env` 可以读取，不会新建或改写。
 
 ## 报告和截图
 
