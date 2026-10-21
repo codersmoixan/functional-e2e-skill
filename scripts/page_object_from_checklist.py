@@ -3,8 +3,11 @@
 
 Called by the playwright-test-automation skill. Do not copy this script into
 the target repository. Only items marked coverage "in suite" are emitted.
-Review the draft, then merge it into an existing page object instead of
-replacing methods that are already maintained.
+Duplicate in-suite items that share the same locator key (role, accessible
+name, visible text, scope) collapse to one field so multiple data variants
+of the same visible result do not block generation. Review the draft, then
+merge it into an existing page object instead of replacing methods that are
+already maintained.
 """
 
 from __future__ import annotations
@@ -85,15 +88,27 @@ def select_items(document: dict, route: str) -> list[dict]:
     if len(pages) > 1:
         joined = ", ".join(pages)
         raise ValueError(f"in-suite items span multiple pages: {joined}. Run the script once per page.")
-    counts: dict[tuple[str, str, str, str, str], int] = {}
+    # Same visible control listed for multiple data variants (e.g. two wrong-login
+    # cases that share one error message) must emit one locator. Keep the first
+    # in-suite item per locator key; specs still cover each variant separately.
+    deduped: list[dict] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    skipped: list[str] = []
     for item in matched:
         key = locator_key(item)
-        counts[key] = counts.get(key, 0) + 1
-    ambiguous = [key for key, count in counts.items() if count > 1]
-    if ambiguous:
-        rendered = ", ".join(f"{role or 'control'} {visible or accessible or '(unnamed)'}" for role, accessible, visible, _scope, _scope_role in ambiguous)
-        raise ValueError(f"ambiguous in-suite controls need a unique scope before generating locators: {rendered}")
-    return matched
+        if key in seen:
+            role, accessible, visible, _scope, _scope_role = key
+            skipped.append(f"{role or 'control'} {visible or accessible or '(unnamed)'}")
+            continue
+        seen.add(key)
+        deduped.append(item)
+    if skipped:
+        unique_skipped = ", ".join(dict.fromkeys(skipped))
+        print(
+            f"note: deduped duplicate in-suite locator(s) to one page-object field: {unique_skipped}",
+            file=sys.stderr,
+        )
+    return deduped
 
 
 def inner_locator(item: dict) -> str:
@@ -235,21 +250,34 @@ def self_test() -> None:
     )
     assert "getByRole('heading', { name: 'Details' }).locator('..').getByRole('button').filter({ hasText: 'Save' })" in mismatched
     assert "Login" not in mismatched
-    try:
-        render_class(
-            {
-                "items": [
-                    {"role": "button", "name": "Add", "visibleText": "Add", "coverage": "in suite"},
-                    {"role": "button", "name": "Add", "visibleText": "Add", "coverage": "in suite"},
-                ]
-            },
-            "FormPage",
-            "/form",
-        )
-    except ValueError as error:
-        assert "ambiguous in-suite controls" in str(error)
-    else:
-        raise AssertionError("duplicate controls should be rejected")
+    deduped = render_class(
+        {
+            "items": [
+                {
+                    "role": "paragraph",
+                    "name": "The email or password you entered is incorrect.",
+                    "visibleText": "The email or password you entered is incorrect.",
+                    "scope": "Log in",
+                    "scopeRole": "heading",
+                    "coverage": "in suite",
+                    "path": "failure",
+                },
+                {
+                    "role": "paragraph",
+                    "name": "The email or password you entered is incorrect.",
+                    "visibleText": "The email or password you entered is incorrect.",
+                    "scope": "Log in",
+                    "scopeRole": "heading",
+                    "coverage": "in suite",
+                    "path": "failure",
+                },
+            ]
+        },
+        "LoginPage",
+        "/login",
+    )
+    assert deduped.count(": Locator;") == 1
+    assert "The email or password you entered is incorrect." in deduped
 
 
 def parse_args() -> argparse.Namespace:

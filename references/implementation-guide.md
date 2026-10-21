@@ -46,7 +46,7 @@ Before editing, determine:
 6. Required account roles, seed data, APIs, environment variables, and feature flags.
 7. CI platform and any existing artifact conventions.
 
-Reuse the `qa/functional` test install, Playwright browser cache, and compatible existing harness. Do not install functional-test packages into the application or into a repository-root `package.json`, and do not run an interactive initializer over an established harness. Run `playwright test`, `allure`, and `playwright-cli` with the working directory `qa/functional` so the CLI session directory is `qa/functional/.playwright-cli/`. For a remote target without a repository, first look for a compatible standalone harness in the current workspace. For a genuinely new harness, either use the official initializer when interaction is appropriate or add the minimum files deliberately with the project's package manager.
+Reuse the `qa/functional` test install, Playwright browser cache, and compatible existing harness. Do not install functional-test packages into the application or into a repository-root `package.json`, and do not run an interactive initializer over an established harness. Run `playwright test`, `allure`, and `playwright-cli` with the working directory `qa/functional` so the CLI session directory is `qa/functional/.playwright-cli/`. For a remote target without a repository, first look for a compatible standalone harness in the current workspace. When `qa/functional` is missing but the workspace already has a sibling functional harness for the same app (for example `qa_one/functional` with Playwright config, page objects, and matching e2e specs), copy or align the compatible pieces into `qa/functional` instead of rediscovering the page from scratch. Keep `qa/functional` as the only canonical harness this skill maintains; do not keep editing the sibling in parallel. For a genuinely new harness, either use the official initializer when interaction is appropriate or add the minimum files deliberately with the project's package manager.
 
 ## Execution profiles
 
@@ -62,13 +62,15 @@ For a warm local cache, avoid dependency installation and browser downloads. Ins
 
 Use `workers: 1` for authentication or other shared-state flows unless the target is known to isolate them safely. Prefer behavioral equivalence classes to multiple examples with the same expected outcome.
 
-A compact login smoke matrix is:
+**Scenario matrix precedence:** when the user names the cases to run (for example “correct account plus two wrong accounts”), implement that matrix. The compact default below applies only when the user did not specify the scenarios.
+
+A compact login smoke matrix (default when unspecified) is:
 
 1. valid credentials reach the authenticated state;
 2. empty or malformed input is rejected by client-side validation, if present;
 3. one valid-format nonexistent account is rejected by the server.
 
-Do not send several invented accounts merely to repeat the same server-side rejection branch. If the target starts suppressing feedback, returning throttling responses, or slowing repeated requests, stop equivalent repetitions and record the behavior. Add a cooldown only when the cooldown itself is part of the requirement or the target documents it as necessary; do not turn a discovered delay into a universal fixed wait.
+When inventing cases under the default matrix, do not send several accounts merely to repeat the same server-side rejection branch. When the user asks for multiple wrong-account cases, still use one checklist control for the shared error message and multiple specs (or parameterized data) against that same page-object locator. If the target starts suppressing feedback, returning throttling responses, or slowing repeated requests, stop equivalent repetitions and record the behavior. Add a cooldown only when the cooldown itself is part of the requirement or the target documents it as necessary; do not turn a discovered delay into a universal fixed wait.
 
 ## Saved login
 
@@ -160,9 +162,37 @@ A representative configuration shape is:
 
 ```ts
 // qa/functional/playwright.config.ts
-// Paths in this file are relative to qa/functional/. Secrets come from the repository-root .env.
+// Paths in this file are relative to qa/functional/.
+// Repository root is ../.. when this file lives at <repo>/qa/functional/playwright.config.ts.
+import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+const functionalDir = __dirname;
+const repoRoot = path.join(functionalDir, '../..');
+
+function loadEnvFile(filePath: string) {
+  if (!fs.existsSync(filePath)) return;
+  for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadEnvFile(path.join(repoRoot, '.env'));
+loadEnvFile(path.join(repoRoot, '.env.local'));
+loadEnvFile(path.join(functionalDir, '.env'));
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -174,7 +204,7 @@ export default defineConfig({
   ],
   outputDir: 'test-results/artifacts',
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: process.env.BASE_URL ?? 'http://127.0.0.1:3000',
     trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -184,14 +214,17 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    cwd: path.join(__dirname, '..'),
-    url: 'http://127.0.0.1:3000',
+    // Point at the directory that owns the app start script (often <repo>/ or <repo>/nextjs).
+    cwd: path.join(repoRoot, 'nextjs'),
+    url: process.env.BASE_URL ?? 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
   },
 });
 ```
 
-`webServer.cwd` points at the directory that contains the application start script. That may be outside `qa/functional`; it is the process cwd for starting the app, not a place to write test files. `outputDir`, the HTML report, and the blob report stay inside `qa/functional` (`test-results/`, `playwright-report/`, `blob-report/`). Load secrets from an existing repository-root `.env` when present, otherwise from `qa/functional/.env`. Do not create or modify the repository-root `.env`.
+`webServer.cwd` points at the directory that contains the application start script. That may be outside `qa/functional`; it is the process cwd for starting the app, not a place to write test files. `outputDir`, the HTML report, and the blob report stay inside `qa/functional` (`test-results/`, `playwright-report/`, `blob-report/`). Load secrets from the **repository root** `.env` / `.env.local` first (`path.join(functionalDir, '../..', '.env')` when the harness is `qa/functional`), then from `qa/functional/.env`. Do not use `path.join(functionalDir, '..', '.env')` for the repository root — that resolves to `qa/.env`, not the repo root. Do not create or modify the repository-root `.env`.
+
+When scaffolding `qa/functional/package.json`, pin a compatible Allure set so peers resolve cleanly, for example the same major.minor for `allure-playwright` and `allure-js-commons` (such as both `3.14.x`). Do not leave `allure-js-commons` on an older minor that declares an unmet peer on `allure-playwright`.
 
 Change the URL, command, package manager, projects, and artifact choices to match the project. Do not add a `webServer` for a remote target.
 
@@ -222,7 +255,7 @@ The JSON for each item also stores `accessibleName`, `visibleText`, `page`, `sco
 
 - Scope the list to the named function. Include a visible control when the function uses it.
 - A success path is required for each action. A validation or failure path is required when the page shows that outcome or the user stated it.
-- Repeated inputs with the same visible result become one item. A login function therefore gets one valid submission, client-side empty or malformed validation when that message is visible, and one valid-format rejected account when that response is visible.
+- Repeated inputs with the same visible result become **one checklist item** (one locator). Multiple wrong-account or data variants that share that result become multiple specs (or parameterized rows) that reuse the same page-object field — do not mark two `in suite` rows for the same role, visible text, and scope. Under the default smoke matrix, a login function therefore gets one valid submission, client-side empty or malformed validation when that message is visible, and one valid-format rejected account when that response is visible. When the user asks for more wrong-account cases, keep the single shared error control in the checklist and add the extra cases only in the spec.
 - After the checklist exists, the page object and specs implement the items marked `in suite`. Items left `not yet covered` stay in the report.
 - Initialization does not create a checklist.
 
@@ -234,7 +267,7 @@ When the first specs for a page are written, create that page's page object in t
 - If a page object for that page already exists, extend it with the locators and actions this test needs. Do not create a second class for the same page.
 - The page object owns `goto`, locators, and user actions such as filling a form or submitting. The spec owns test data and assertions.
 - Locators must come from the live page, via playwright-cli, or from the page's source. Do not add controls that were not observed.
-- When the accessible name and the visible text are the same, use `getByRole(role, { name })`. When they differ, use `getByRole(role).filter({ hasText: visibleText })`. When `scope` is set, start from that heading or region and search inside its parent. Run `scripts/page_object_from_checklist.py` once per page. It skips in-suite items whose `page` is a different URL, and it exits without writing a file when two in-suite items still share the same role, visible text, and scope.
+- When the accessible name and the visible text are the same, use `getByRole(role, { name })`. When they differ, use `getByRole(role).filter({ hasText: visibleText })`. When `scope` is set, start from that heading or region and search inside its parent. Run `scripts/page_object_from_checklist.py` once per page. It skips in-suite items whose `page` is a different URL. Duplicate in-suite items that share the same role, accessible name, visible text, and scope collapse to one locator field (with a stderr note); prefer editing the checklist so only one of those rows is `in suite` before generating.
 - Before the first suite run, resolve every in-suite locator and require `count()` to be 1. A heading that is only present in the accessibility tree does not prove the overlay is open; the control the next action uses must be inside the viewport.
 - The viewport is 1920×1080 unless this invocation states another resolution. Set that size in `test.use({ viewport })` and keep `deviceScaleFactor` at 1. While a `dialog`, `alertdialog`, `menu`, or `listbox` is open, compare each action control's bottom with `window.innerHeight`. If the control sits below the viewport, scroll the overlay element that contains the control. Do not scroll the document behind the overlay, do not call `scrollIntoViewIfNeeded()` on a control inside a fixed overlay, and do not change the chosen resolution to make the control fit.
 - Initialization alone does not create page objects.
@@ -361,9 +394,9 @@ Screenshot size is 1920×1080 unless this invocation states another resolution, 
 
 Screenshot timing has two modes. Use the default unless this invocation says otherwise.
 
-- **Each operation (default).** After every user-visible operation completes, attach one viewport screenshot to that step. Name the image with the step name.
+- **Each operation (default).** After every user-visible operation completes, attach one viewport screenshot to that step. Name the image with the step name. Attach it in **either** the page-object action step **or** the matching spec assertion step — not both for the same operation, or the Allure report doubles every image.
 - **Each completed flow.** Attach one viewport screenshot only after the flow's final assertion. Name the image with the flow title. Earlier steps in that flow stay in the report without their own screenshots. Use this mode when the user says to capture once after each flow finishes, for example “每个流程完成后再截一张”.
 
-Put a per-operation screenshot in the page-object method only for the default mode. For the flow mode, attach the one screenshot from the spec after the final assertion. Adding or omitting these screenshots does not change the scenario or the assertion. The runner's failure-only screenshot setting does not replace them. Keep passwords and tokens out of screenshot file names.
+Preferred default split: put the per-operation screenshot in the page-object method for fills and clicks; in the spec, attach a screenshot only on assertion steps that are not already covered by that action. For the flow mode, attach the one screenshot from the spec after the final assertion and do not attach from page-object methods. Adding or omitting these screenshots does not change the scenario or the assertion. The runner's failure-only screenshot setting does not replace them. Keep passwords and tokens out of screenshot file names.
 
 Playwright Test records these through `allure-playwright`. pytest records them through `allure-pytest` steps, titles, and attachments. Do not invent a second report format when this layout already exists.
