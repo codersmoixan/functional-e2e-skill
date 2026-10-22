@@ -1,4 +1,4 @@
 interface:
   display_name: "functional-e2e"
-  short_description: "初始化 qa/functional 下的功能 E2E（Playwright Test + Allure）；首次测试页面时生成功能清单和 PO，已有用例或再次执行时直接复用；打开浏览器时使用 playwright-cli"
+  short_description: "qa/functional 功能 E2E（Playwright + Allure）；产品缺陷出复核报告，Send 后修应用并重跑；打开浏览器用 playwright-cli"
   default_prompt: "使用 $functional-e2e 为当前 Web 项目初始化可验证、可扩展的功能端到端测试脚手架（Playwright）。"

@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "functional-e2e findings",
+  "description": "Application defects (and reviewer-filed misses) from a functional Playwright run, ready for the interactive review report.",
+  "type": "object",
+  "required": ["kind", "version", "slug", "feature", "generatedAt", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "functional-qa-findings" },
+    "version": { "const": 1 },
+    "slug": { "type": "string", "minLength": 1 },
+    "feature": { "type": "string", "minLength": 1 },
+    "locale": { "enum": ["en", "zh"] },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "allureReport": { "type": ["string", "null"] },
+    "allureUrl": { "type": ["string", "null"] },
+    "runId": { "type": ["string", "null"] },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/finding" }
+    }
+  },
+  "definitions": {
+    "finding": {
+      "type": "object",
+      "required": ["title", "severity", "classification", "resolution", "expected", "actual"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^FQ-\\d{3,}$" },
+        "ref": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["BLOCKER", "WARNING", "PASS"] },
+        "classification": {
+          "enum": ["application_defect", "test_defect", "environment", "flaky", "annotation"]
+        },
+        "resolution": {
+          "enum": ["FIX_CODE", "FIX_TEST", "DISMISSED", "INTENTIONAL", "DEBT", "NONE", "PASS"]
+        },
+        "spec": { "type": ["string", "null"] },
+        "step": { "type": ["string", "null"] },
+        "route": { "type": ["string", "null"] },
+        "expected": { "type": "string" },
+        "actual": { "type": "string" },
+        "reproduction": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "screenshots": { "type": "array", "items": { "type": "string" } },
+            "trace": { "type": ["string", "null"] },
+            "allureUrl": { "type": ["string", "null"] },
+            "errorMessage": { "type": ["string", "null"] }
+          }
+        },
+        "sourceHints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "fix": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "summary": { "type": "string" }
+          }
+        },
+        "fingerprint": { "type": ["string", "null"] },
+        "annotation": { "type": ["string", "null"], "pattern": "^AN-\\d{3,}$" },
+        "triage": { "enum": ["fix-now", "debt", null] },
+        "dismiss": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["not-an-issue", "remove", "intentional"] },
+            "reason": { "type": "string", "minLength": 1 },
+            "by": { "type": ["string", "null"] },
+            "date": { "type": ["string", "null"], "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}

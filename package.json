@@ -1,0 +1,19 @@
+{
+  "name": "functional-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Functional E2E Playwright skill: Allure reports plus interactive review → Send → fix-loop",
+  "type": "module",
+  "bin": {},
+  "scripts": {
+    "findings-from-run": "node scripts/findings-from-run.mjs",
+    "build-review-report": "node scripts/build-review-report.mjs",
+    "review": "node scripts/review.mjs",
+    "apply-decisions": "node scripts/apply-decisions.mjs",
+    "dismiss": "node scripts/dismiss.mjs",
+    "triage": "node scripts/triage.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

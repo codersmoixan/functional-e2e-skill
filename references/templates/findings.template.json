@@ -1,0 +1,47 @@
+{
+  "kind": "functional-qa-findings",
+  "version": 1,
+  "slug": "<function>-<YYYYMMDD-HHMMSS>",
+  "feature": "<function>",
+  "locale": "en",
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "allureReport": "qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>",
+  "allureUrl": null,
+  "runId": null,
+  "findings": [
+    {
+      "ref": "fail-1",
+      "title": "App does not show the expected result after the user action",
+      "severity": "BLOCKER",
+      "classification": "application_defect",
+      "resolution": "FIX_CODE",
+      "spec": "qa/functional/tests/e2e/<function>/<function>.spec.ts",
+      "step": "assert visible outcome",
+      "route": "/example",
+      "expected": "Visible success state described by the checklist",
+      "actual": "Error message or missing control observed",
+      "reproduction": [
+        "Open the page",
+        "Perform the user action",
+        "Observe the actual result"
+      ],
+      "evidence": {
+        "screenshots": ["evidence/fail-1.png"],
+        "trace": null,
+        "allureUrl": null,
+        "errorMessage": null
+      },
+      "sourceHints": [
+        {
+          "path": "app/example/page.tsx",
+          "reason": "route match"
+        }
+      ],
+      "fix": {
+        "summary": "Make the page show the expected visible outcome after the action."
+      },
+      "fingerprint": null,
+      "triage": "fix-now"
+    }
+  ]
+}

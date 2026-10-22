@@ -1,0 +1,4 @@
+node_modules/
+.smoke-review/
+*.log
+.DS_Store

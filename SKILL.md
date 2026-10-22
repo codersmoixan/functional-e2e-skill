@@ -8,18 +8,24 @@ description: >
   and specs. When the user supplies specs, or that page already has a checklist,
   page object, and specs, run those specs immediately. Skip guide reading,
   checklist comparison, and playwright-cli until that attempt fails. After one
-  failure, run the diagnosis flow once, repair a stale locator or recheck the
-  failing control, and rerun only the affected spec. Recompare the whole checklist
-  before a run only when the user explicitly asks, or explicitly says controls
-  were added, removed, or changed. Use the bundled scripts in scripts/ for a new
-  checklist, page-object draft, and report counts. When opening a browser outside
-  playwright test, read the bundled playwright-cli guide and use playwright-cli
-  (or npx playwright cli). When the user asks to test a page, flow, or function,
-  always write or reuse the page object and spec, run that spec, generate the
-  Allure report, and open it. A browser-only pass does not finish the request.
-  Trigger on /functional-e2e, functional E2E, 功能测试, or Playwright E2E for this
-  repo. Do not switch to browser-functional-testing because the user said “测一下”
-  or did not name Playwright. Do not use this skill for design-parity / Figma visual QA.
+  failure, run the diagnosis flow once: repair a stale locator for test defects;
+  for application defects, file findings, build an interactive review report, open
+  review, and after Send (or a pasted "Apply my functional QA review") apply
+  decisions and fix application code in the fix-loop, then re-run affected specs.
+  Recompare the whole checklist before a run only when the user explicitly asks,
+  or explicitly says controls were added, removed, or changed. Use the bundled
+  scripts in scripts/ for checklists, page objects, Allure counts, findings,
+  review, and apply-decisions. When opening a browser outside playwright test,
+  read the bundled playwright-cli guide and use playwright-cli (or npx playwright
+  cli). When the user asks to test a page, flow, or function, always write or
+  reuse the page object and spec, run that spec, generate the Allure report, and
+  open it; when product defects remain, also open the functional review report.
+  A browser-only pass does not finish the request. Trigger on /functional-e2e,
+  functional E2E, 功能测试, Playwright E2E, or a message that starts with
+  "Apply my functional QA review". Do not switch to browser-functional-testing
+  because the user said “测一下” or did not name Playwright. Do not use this
+  skill for design-parity / Figma visual QA.
+argument-hint: <page|flow|function|init> | apply
 ---
 
 # Functional E2E
@@ -88,9 +94,9 @@ Read only what the command needs: the spec's `storageState` and environment vari
 If that attempt fails, run this diagnosis flow once:
 
 1. Read the failure message and its artifacts.
-2. An application defect stops there. Report the reproduction and evidence. Do not open the page to rebuild the checklist, and do not rerun that case.
-3. A stale locator, a control the spec can no longer find, a compile or configuration error, or a rejected saved login opens the fuller flow. Read the guide that failure needs, and open playwright-cli only when a live control has to be checked. Compare the failing control with the checklist. Repair the page-object locator when it is stale. Rerun only the affected spec once.
-4. On a live or shared target, that rerun is the only diagnostic rerun. On a disposable local target, the later repair limit in [Run, classify, and refine](#run-classify-and-refine) still applies.
+2. An **application defect** does not rebuild the checklist and does not rerun that case for harness healing. After Allure is published, enter the **review path** in [Application defects: review and fix](#application-defects-review-and-fix): file findings (with reproduction, evidence, and best-effort `sourceHints`), build `report.html`, open `review.mjs`, and wait for Send (or a pasted `Apply my functional QA review`). Do not modify application code until decisions are applied.
+3. A stale locator, a control the spec can no longer find, a compile or configuration error, or a rejected saved login opens the fuller harness flow. Read the guide that failure needs, and open playwright-cli only when a live control has to be checked. Compare the failing control with the checklist. Repair the page-object locator when it is stale. Rerun only the affected spec once. These **test defects** do not open the product review UI.
+4. On a live or shared target, that harness rerun is the only diagnostic rerun. On a disposable local target, the later repair limit in [Run, classify, and refine](#run-classify-and-refine) still applies.
 
 A missing page object, a request to regenerate the checklist, or an explicit statement that controls were added, removed, or changed still uses the authoring or recompare path before the run.
 
@@ -162,7 +168,7 @@ Read [implementation-guide.md](references/implementation-guide.md) before creati
 - For a new suite, use `qa/functional/tests/e2e/`. Extend that directory when it already exists.
 - Create or update `qa/functional/playwright.config.*` with the correct `testDir`, `baseURL`, browser projects, timeouts, retries, artifact policy, reporters, and `webServer` when Playwright should start the application.
 - Add test scripts only to `qa/functional/package.json`. Do not add them to the application `package.json` or a repository-root `package.json`.
-- Ignore generated directories only in `qa/functional/.gitignore`: `node_modules/`, `.playwright-cli/`, `.env`, `.auth/`, `reports/allure-results/`, `reports/allure-report/`, `reports/prompts/`, `test-results/`, `playwright-report/`, and `blob-report/`. Never ignore the specs, `qa/functional/package.json`, the lockfile, or configuration. Do not edit any other `.gitignore`.
+- Ignore generated directories only in `qa/functional/.gitignore`: `node_modules/`, `.playwright-cli/`, `.env`, `.auth/`, `reports/allure-results/`, `reports/allure-report/`, `reports/review/`, `reports/prompts/`, `test-results/`, `playwright-report/`, and `blob-report/`. Never ignore the specs, `qa/functional/package.json`, the lockfile, configuration, `qa/functional/dismissed.json`, or `qa/functional/functional-debt.md`. Do not edit any other `.gitignore`.
 - Put secrets in environment variables and keep authentication state or credential files out of version control. Ignore the saved-login file, such as `qa/functional/.auth/`.
 - In smoke mode, install only a missing Chromium binary. Do not install additional browsers unless the selected profile needs them.
 - In initialize-only mode, do not download browser binaries unless they are required for a user-requested smoke execution. Dependency installation and browser installation are separate steps; report either one as blocked rather than pretending the scaffold is verified.
@@ -196,10 +202,25 @@ Skip this section in initialize mode after configuration loading and test discov
 4. Classify every failure before rerunning it as a test defect, application defect, environment problem, or missing prerequisite.
 5. Fix generated test defects and rerun only the affected tests. Do not weaken a valid assertion merely to make the suite green.
 6. On a live or shared target, allow at most one diagnostic rerun for a materially similar failure. On a disposable local target, stop after three materially similar unsuccessful repair attempts. Treat these as one overlay failure, keep the chosen screenshot size, scroll the overlay container once, then rerun: a timeout waiting for a control inside an overlay, a strict-mode match on a repeated visible label, or an overlay that disappears after a screenshot or scroll so a later control cannot be found.
-7. Modify application code only when the user requested fixes. Preserve the failing reproduction before any application change, then rerun the affected test and a proportionate regression set.
-8. Run the final relevant suite once. For broad suites, use fail-fast or `maxFailures` when early failure makes further execution wasteful.
+7. **Application defects:** after Allure, follow [Application defects: review and fix](#application-defects-review-and-fix). Reviewer Send (or `Apply my functional QA review`) authorizes the fix-loop on the fix-now set; do not change application code for product bugs before that. Preserve the failing reproduction before any application change, then rerun the affected tests per [fix-loop.md](references/fix-loop.md).
+8. Run the final relevant suite once when finishing without an open review, or after the fix-loop verification pass. For broad suites, use fail-fast or `maxFailures` when early failure makes further execution wasteful.
 
 An unexecuted or blocked test is never a pass. If a retry passes after an earlier failure, report it as flaky when Playwright or repeated execution demonstrates inconsistent behavior.
+
+## Application defects: review and fix
+
+Read [review.md](references/review.md) and [fix-loop.md](references/fix-loop.md) when this path runs. Allure remains mandatory; the review report is an additional gate for product bugs.
+
+1. After Allure generate + open, if any failure is classified `application_defect`, create `qa/functional/reports/review/<function>-<YYYYMMDD-HHMMSS>/` using the **same** slug as the Allure directories.
+2. Run `node <skill>/scripts/findings-from-run.mjs` with `--allure-results`, `--allure-report`, `--allure-url`, `--slug`, `--feature`, and `--locale zh` when the person's message is Chinese (else `en`). Edit `findings.json`: keep only product defects (drop or reclassify pure test defects), write Chinese `title` / free-text when locale is `zh`, fill `reproduction`, and add best-effort `sourceHints` by searching the repo for the route, visible copy, or failing API path.
+3. Run `build-review-report.mjs --dir <review-dir> --locale …` (re-applies `qa/functional/dismissed.json`).
+4. Run `review.mjs --report <review-dir>/report.json` (long-running). Tell the person the Review URL: Fix now / Debt / Dismiss / optional missed issue → **Review and send** (zh CTA: **复核并发送**).
+5. When Send exits 0, or the person pastes **`Apply my functional QA review`**, run `apply-decisions.mjs` immediately in the same turn (save a pasted message to a file and pass `--from`). Then fix only the printed fix-now set per [fix-loop.md](references/fix-loop.md): change application code, re-run affected specs, mark verified findings `severity`/`resolution` `PASS`, rebuild the review report.
+6. Debt goes to `qa/functional/functional-debt.md`. Dismissals go to `qa/functional/dismissed.json` (committed). Ignore `reports/review/` in `qa/functional/.gitignore`.
+
+**Review UI contract:** implement the functional review design in `templates/review-report.html` as specified in [review.md](references/review.md) § “Review report UI” (Neutral tokens, finding cards, bottom-centre floating **复核并发送** / Review and send bar). Change the template + rebuild; do not invent a different footer or palette without updating that spec.
+
+If the person will not review now, say so, leave Allure + `report.html` paths in the summary, and do not start the fix-loop until they Send, paste Apply, or run chat `triage.mjs` / explicitly ask to fix.
 
 ## Produce the report
 
@@ -214,6 +235,8 @@ After the run, provide:
 - created or changed test files;
 - passed, failed, broken, skipped, blocked, and not-run counts, using the bundled report script on this run's `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`;
 - application defects with reproduction steps and evidence;
+- when a review pack exists: the Review URL (or `report.html` path), scorecard verdict, and that Send authorizes fixes;
+- after apply + fix-loop: which finding ids were fixed or remain, plus debt;
 - test-infrastructure failures separately from product failures;
 - the local server URL from `allure open`, plus relevant screenshots and text attachments inside that report;
 - the path of this invocation's prompt file;
@@ -236,7 +259,7 @@ For initialize-only work, report instead:
 
 ## Bundled helpers
 
-Run these scripts from the directory that contains this `SKILL.md`. Do not reimplement them in the target repository, and do not copy them into that repository.
+Run these scripts from the directory that contains this `SKILL.md`. Do not reimplement them in the target repository, and do not copy them into that repository. Python helpers author checklists; Node helpers (Node ≥ 18, no extra npm deps) drive the review pack. Artifact paths such as `qa/functional/...` are relative to the **repository under test**.
 
 ```bash
 python3 scripts/checklist_from_snapshot.py \
@@ -252,6 +275,22 @@ python3 scripts/page_object_from_checklist.py \
 
 python3 scripts/summarize_playwright_report.py \
   --json <playwright-results.json>
+
+node scripts/findings-from-run.mjs \
+  --out qa/functional/reports/review/<function>-<YYYYMMDD-HHMMSS> \
+  --slug <function>-<YYYYMMDD-HHMMSS> \
+  --feature <function> \
+  --allure-results qa/functional/reports/allure-results/<function>-<YYYYMMDD-HHMMSS> \
+  --locale zh|en
+
+node scripts/build-review-report.mjs \
+  --dir qa/functional/reports/review/<function>-<YYYYMMDD-HHMMSS>
+
+node scripts/review.mjs \
+  --report qa/functional/reports/review/<function>-<YYYYMMDD-HHMMSS>/report.json
+
+node scripts/apply-decisions.mjs \
+  --report qa/functional/reports/review/<function>-<YYYYMMDD-HHMMSS>/report.json
 ```
 
 Run the checklist and page-object scripts only when creating the first checklist, or when the user explicitly asked to recompare the checklist and new controls are being appended. On a later run the default is that the page is unchanged, so skip both scripts and skip the live checklist comparison. A missing page object, a stale locator found by a failed run, or an explicit request to regenerate the checklist are the other reasons to edit those artifacts. After a new checklist script run, edit its JSON before drafting the page object. Set `coverage` to `in suite` for controls the named function uses, and fill `expectedResult` from an observed outcome or the user's statement. Add a validation or failure item only when that outcome was observed or stated. Leave every other control `not yet covered`. The page-object script emits only `in suite` items for the requested page, uses the visible text when it differs from the accessible name, scopes repeated labels, dedupes duplicate locator keys to one field, and refuses to overwrite an existing file. Prefer a single `in suite` row per shared visible result before generating. Run it once per page. Review its locators and method names before saving. The report script reads either Playwright JSON or this run's `qa/functional/reports/allure-report/<function>-<YYYYMMDD-HHMMSS>/widgets/summary.json`. Use the Allure summary after generation. Classify blocked and not-run cases outside that file.

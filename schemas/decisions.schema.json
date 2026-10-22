@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "functional-e2e review decisions",
+  "description": "Everything a reviewer decided in report.html: fix now / debt, dismissals with a reason, annotations for missed issues, and whether tickets may be created.",
+  "type": "object",
+  "required": ["kind", "version", "slug", "reportGeneratedAt", "decidedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "functional-qa-decisions" },
+    "version": { "const": 1 },
+    "slug": { "type": "string", "minLength": 1 },
+    "feature": { "type": ["string", "null"] },
+    "reportGeneratedAt": { "type": "string", "format": "date-time" },
+    "decidedBy": { "type": ["string", "null"] },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "tickets": { "type": "boolean" },
+    "triage": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "fixNow": { "type": "array", "items": { "$ref": "#/definitions/findingId" } },
+        "debt": { "type": "array", "items": { "$ref": "#/definitions/findingId" } }
+      }
+    },
+    "dismissals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["findingId", "kind", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "findingId": { "$ref": "#/definitions/findingId" },
+          "kind": { "enum": ["not-an-issue", "remove", "intentional"] },
+          "reason": { "type": "string", "minLength": 1 },
+          "by": { "type": ["string", "null"] },
+          "date": { "type": ["string", "null"], "format": "date-time" }
+        }
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/definitions/annotation" }
+    }
+  },
+  "definitions": {
+    "findingId": { "type": "string", "pattern": "^FQ-\\d{3,}$" },
+    "annotation": {
+      "type": "object",
+      "required": ["note", "severity", "decision"],
+      "additionalProperties": false,
+      "properties": {
+        "note": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["BLOCKER", "WARNING"] },
+        "decision": { "enum": ["fix-now", "debt"] },
+        "spec": { "type": ["string", "null"] },
+        "by": { "type": ["string", "null"] },
+        "date": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}
