@@ -4,7 +4,7 @@ description: Automate browser interactions, test web pages and work with Playwri
 allowed-tools: Bash(playwright-cli:*) Bash(npx playwright:*) Bash(npx --no-install playwright:*)
 ---
 
-> Bundled from [microsoft/playwright-cli skills/playwright-cli](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli). `playwright-test-automation` must follow this file before opening or driving a browser outside `playwright test`.
+> Bundled from [microsoft/playwright-cli skills/playwright-cli](https://github.com/microsoft/playwright-cli/tree/main/skills/playwright-cli). `functional-e2e` must follow this file before opening or driving a browser outside `playwright test`.
 
 Run every command below with the working directory `qa/functional`. playwright-cli writes `.playwright-cli/` in the current directory, and that session directory must stay `qa/functional/.playwright-cli/`, not the repository root. When the global `playwright-cli` command is missing, run `pnpm exec playwright cli` from `qa/functional`.
 

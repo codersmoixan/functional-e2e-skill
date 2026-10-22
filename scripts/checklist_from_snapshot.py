@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draft a functional checklist from a playwright-cli aria snapshot.
 
-Called by the playwright-test-automation skill. Do not copy this script into
+Called by the functional-e2e skill. Do not copy this script into
 the target repository. It records visible controls only. Expected results stay
 empty until the caller fills them from an observed outcome or the user.
 """

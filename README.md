@@ -1,4 +1,4 @@
-# playwright-test-automation
+# functional-e2e
 
 [中文文档](README.zh-CN.md)
 
@@ -19,19 +19,19 @@ Page discovery uses `playwright-cli` (or `npx playwright cli` when the global co
 In the target project, name the skill and the outcome:
 
 ```text
-Use playwright-test-automation to initialize the Playwright Test scaffold for this project.
+Use functional-e2e to initialize the Playwright Test scaffold for this project.
 ```
 
 ```text
-Use playwright-test-automation to test the add-address feature at http://127.0.0.1:3000/address.
+Use functional-e2e to test the add-address feature at http://127.0.0.1:3000/address.
 ```
 
 ```text
-Use playwright-test-automation to run qa/functional/tests/e2e/新增地址/新增地址.spec.ts.
+Use functional-e2e to run qa/functional/tests/e2e/新增地址/新增地址.spec.ts.
 ```
 
 ```text
-Use playwright-test-automation to test 新增地址 again.
+Use functional-e2e to test 新增地址 again.
 ```
 
 Say "regression" for the project's browser matrix, or "CI" to follow the repository's CI settings. Otherwise the run is smoke: Chromium, one representative case per distinct result, and an Allure report.
@@ -76,7 +76,7 @@ When the run ends, the prompt that invoked the skill is saved under the same nam
 Screenshots and the browser viewport default to 1920×1080, including every image in the Allure report. State another size in the request when you want one, for example `1440×900`. Ask for one screenshot per completed flow when you only want an image after the flow's final assertion:
 
 ```text
-Use playwright-test-automation to test 新增地址, and take one screenshot after each flow completes.
+Use functional-e2e to test 新增地址, and take one screenshot after each flow completes.
 ```
 
 Passwords and tokens are kept out of source, screenshot names, and text attachments.

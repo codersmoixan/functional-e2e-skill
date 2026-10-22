@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Count Playwright JSON or Allure summary.json results.
 
-Called by the playwright-test-automation skill. Do not copy this script into
+Called by the functional-e2e skill. Do not copy this script into
 the target repository. Blocked and not-run cases that never entered the runner
 stay in the caller's report; this script only reads the JSON file.
 """

@@ -1,4 +1,4 @@
-# playwright-test-automation
+# functional-e2e
 
 [English](README.md)
 
@@ -19,19 +19,19 @@
 在目标项目中写明 skill 名和你要的结果：
 
 ```text
-使用 playwright-test-automation 为当前项目初始化 Playwright Test 脚手架。
+使用 functional-e2e 为当前项目初始化 Playwright Test 脚手架。
 ```
 
 ```text
-使用 playwright-test-automation 测试 http://127.0.0.1:3000/address 的新增地址。
+使用 functional-e2e 测试 http://127.0.0.1:3000/address 的新增地址。
 ```
 
 ```text
-使用 playwright-test-automation 运行 qa/functional/tests/e2e/新增地址/新增地址.spec.ts。
+使用 functional-e2e 运行 qa/functional/tests/e2e/新增地址/新增地址.spec.ts。
 ```
 
 ```text
-使用 playwright-test-automation 再次测试新增地址。
+使用 functional-e2e 再次测试新增地址。
 ```
 
 说「回归」时使用项目配置的浏览器；说「按 CI 配置跑」时对齐仓库的 CI 设置。除此之外默认是 smoke：只用 Chromium，同一结果只保留一条代表性用例，并生成 Allure 报告。
@@ -76,7 +76,7 @@ Page Object 放在 `qa/functional/tests/pages/`，多个功能可以共用同一
 截图和浏览器视口默认是 1920×1080，测试报告里的图也是这个尺寸。调用时可以指定别的分辨率，例如 `1440×900`。如果只想在一条流程结束时截一张，调用时说明：
 
 ```text
-使用 playwright-test-automation 测试新增地址，每个流程完成后再截一张。
+使用 functional-e2e 测试新增地址，每个流程完成后再截一张。
 ```
 
 密码和 token 不写入源码、截图文件名和文本附件。

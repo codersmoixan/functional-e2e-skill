@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draft a Playwright page object from a checklist JSON file.
 
-Called by the playwright-test-automation skill. Do not copy this script into
+Called by the functional-e2e skill. Do not copy this script into
 the target repository. Only items marked coverage "in suite" are emitted.
 Duplicate in-suite items that share the same locator key (role, accessible
 name, visible text, scope) collapse to one field so multiple data variants

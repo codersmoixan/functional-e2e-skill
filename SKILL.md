@@ -1,9 +1,28 @@
 ---
-name: playwright-test-automation
-description: Initialize or extend a repository-native Playwright Test scaffold, then author, run, and diagnose maintainable end-to-end tests with a generated Allure report. The first time a page is tested, open it with playwright-cli, generate a functional checklist, then write its page object and specs. When the user supplies specs, or that page already has a checklist, page object, and specs, run those specs immediately. Skip guide reading, checklist comparison, and playwright-cli until that attempt fails. After one failure, run the diagnosis flow once, repair a stale locator or recheck the failing control, and rerun only the affected spec. Recompare the whole checklist before a run only when the user explicitly asks, or explicitly says controls were added, removed, or changed. Use the bundled scripts in scripts/ for a new checklist, page-object draft, and report counts. When opening a browser outside playwright test, read the bundled playwright-cli guide and use playwright-cli (or npx playwright cli). When the user asks to test a page, flow, or function, always write or reuse the page object and spec, run that spec, generate the Allure report, and open it. A browser-only pass does not finish the request. Do not switch to browser-functional-testing because the user said “测一下” or did not name Playwright.
+name: functional-e2e
+description: >
+  Functional end-to-end testing under qa/functional (Playwright Test + Allure).
+  Initialize or extend a repository-native Playwright scaffold, then author, run,
+  and diagnose maintainable E2E tests. The first time a page is tested, open it
+  with playwright-cli, generate a functional checklist, then write its page object
+  and specs. When the user supplies specs, or that page already has a checklist,
+  page object, and specs, run those specs immediately. Skip guide reading,
+  checklist comparison, and playwright-cli until that attempt fails. After one
+  failure, run the diagnosis flow once, repair a stale locator or recheck the
+  failing control, and rerun only the affected spec. Recompare the whole checklist
+  before a run only when the user explicitly asks, or explicitly says controls
+  were added, removed, or changed. Use the bundled scripts in scripts/ for a new
+  checklist, page-object draft, and report counts. When opening a browser outside
+  playwright test, read the bundled playwright-cli guide and use playwright-cli
+  (or npx playwright cli). When the user asks to test a page, flow, or function,
+  always write or reuse the page object and spec, run that spec, generate the
+  Allure report, and open it. A browser-only pass does not finish the request.
+  Trigger on /functional-e2e, functional E2E, 功能测试, or Playwright E2E for this
+  repo. Do not switch to browser-functional-testing because the user said “测一下”
+  or did not name Playwright. Do not use this skill for design-parity / Figma visual QA.
 ---
 
-# Playwright Test Automation
+# Functional E2E
 
 Build a repository-native Playwright Test setup and prove that the scaffold is usable. Initialization is a complete mode of its own: when the user asks only to initialize the test scaffold, stop after the harness is configured and validated instead of inventing application-specific scenarios. When the request includes test authoring or execution, continue through durable test cases, execution artifacts, diagnosis, and an evidence-backed summary.
 
